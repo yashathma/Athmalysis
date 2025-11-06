@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     TickerTockNavigation(
                         navController = navController,
+                        context = this,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }

@@ -8,8 +8,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.SwipeRight
 import androidx.compose.material3.*
@@ -35,6 +37,7 @@ fun NewsScreen(
     articleIndexPerStock: Map<String, Int>,
     endMessageShownForStocks: Set<String>,
     onAISummaryClick: () -> Unit,
+    onWarRoomClick: () -> Unit,
     onStockChange: (String) -> Unit,
     onArticleSwiped: (String, String) -> Unit,
     onArticleIndexChanged: (String, Int) -> Unit,
@@ -175,7 +178,7 @@ fun NewsScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Article display or AI Summary button
         if (showEndMessage) {

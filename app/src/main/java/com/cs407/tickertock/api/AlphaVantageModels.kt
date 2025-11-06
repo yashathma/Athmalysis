@@ -39,5 +39,21 @@ data class NewsItem(
     val timePublished: String?,
     val summary: String?,
     val source: String?,
-    val url: String?
+    val url: String?,
+    @SerializedName("overall_sentiment_score")
+    val overallSentimentScore: Double?,
+    @SerializedName("overall_sentiment_label")
+    val overallSentimentLabel: String?,
+    @SerializedName("ticker_sentiment")
+    val tickerSentiment: List<TickerSentiment>?
+)
+
+data class TickerSentiment(
+    val ticker: String?,
+    @SerializedName("relevance_score")
+    val relevanceScore: String?,
+    @SerializedName("ticker_sentiment_score")
+    val tickerSentimentScore: String?,
+    @SerializedName("ticker_sentiment_label")
+    val tickerSentimentLabel: String?
 )

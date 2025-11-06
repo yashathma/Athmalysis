@@ -2,6 +2,8 @@ package com.cs407.tickertock.api
 
 import com.cs407.tickertock.data.NewsArticle
 import com.cs407.tickertock.data.Stock
+import com.cs407.tickertock.data.StockSentiment
+import com.cs407.tickertock.data.SentimentArticle
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -176,6 +178,91 @@ class AlphaVantageService {
             }
         } catch (e: Exception) {
             timestamp
+        }
+    }
+
+    /**
+     * Fetch sentiment analysis for a symbol
+     */
+    suspend fun fetchSentiment(symbol: String, attemptCount: Int = 0): Result<StockSentiment> {
+        return try {
+            if (attemptCount >= ApiKeyManager.getTotalKeys()) {
+                return Result.failure(Exception("All API keys have reached their rate limit"))
+            }
+
+            val apiKey = ApiKeyManager.getNextKey()
+            val response = api.getNewsSentiment(tickers = symbol, apiKey = apiKey)
+
+            if (response.isSuccessful) {
+                val body = response.body()
+
+                // Check if rate limit hit
+                if (body?.information != null || body?.note != null) {
+                    return fetchSentiment(symbol, attemptCount + 1)
+                }
+
+                val newsItems = body?.feed?.take(20) ?: emptyList()
+
+                if (newsItems.isEmpty()) {
+                    return Result.failure(Exception("No sentiment data available"))
+                }
+
+                // Calculate aggregate sentiment score
+                var totalScore = 0.0
+                var totalWeight = 0.0
+                val articles = mutableListOf<SentimentArticle>()
+
+                for (item in newsItems) {
+                    // Find sentiment for this specific ticker
+                    val tickerSentiment = item.tickerSentiment?.find {
+                        it.ticker?.equals(symbol, ignoreCase = true) == true
+                    }
+
+                    val sentimentScore = tickerSentiment?.tickerSentimentScore?.toDoubleOrNull() ?: 0.0
+                    val relevanceScore = tickerSentiment?.relevanceScore?.toDoubleOrNull() ?: 0.5
+                    val sentimentLabel = tickerSentiment?.tickerSentimentLabel ?: "Neutral"
+
+                    // Weight sentiment by relevance
+                    totalScore += sentimentScore * relevanceScore
+                    totalWeight += relevanceScore
+
+                    articles.add(SentimentArticle(
+                        title = item.title ?: "Article",
+                        publisher = item.source ?: "Unknown",
+                        publishedAt = formatTimeAgo(item.timePublished),
+                        sentimentScore = sentimentScore,
+                        sentimentLabel = sentimentLabel,
+                        relevanceScore = relevanceScore,
+                        summary = item.summary ?: "",
+                        url = item.url
+                    ))
+                }
+
+                // Calculate weighted average sentiment
+                val avgSentiment = if (totalWeight > 0) totalScore / totalWeight else 0.0
+
+                // Determine overall label based on average
+                val overallLabel = when {
+                    avgSentiment >= 0.35 -> "Bullish"
+                    avgSentiment >= 0.15 -> "Somewhat-Bullish"
+                    avgSentiment >= -0.15 -> "Neutral"
+                    avgSentiment >= -0.35 -> "Somewhat-Bearish"
+                    else -> "Bearish"
+                }
+
+                Result.success(StockSentiment(
+                    stockSymbol = symbol,
+                    sentimentScore = avgSentiment,
+                    sentimentLabel = overallLabel,
+                    articleCount = articles.size,
+                    lastUpdated = System.currentTimeMillis(),
+                    supportingArticles = articles
+                ))
+            } else {
+                Result.failure(Exception("API error: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
