@@ -211,11 +211,12 @@ def plot_risk_neutral_density(ticker, expiration_date, r=0.045,
 
 # Example usage
 if __name__ == "__main__":
-    plot_risk_neutral_density("SPY", "2026-02-13")
     plot_risk_neutral_density("SPY", "2026-02-20")
-    plot_risk_neutral_density("SPY", "2026-04-17")
-    plot_risk_neutral_density("SPY", "2026-06-30")
-    plot_risk_neutral_density("SPY", "2027-01-15")
+    plot_risk_neutral_density("SPY", "2026-02-27")
+    plot_risk_neutral_density("SPY", "2026-03-06")
+    plot_risk_neutral_density("SPY", "2026-03-13")
+    plot_risk_neutral_density("SPY", "2026-03-20")
+    plot_risk_neutral_density("SPY", "2026-03-27")
 
 
     # SPY Expirations:
