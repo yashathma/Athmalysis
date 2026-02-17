@@ -43,4 +43,4 @@ def print_option_chain(ticker, expiration_date):
 
 # Example usage:
 if __name__ == "__main__":
-    print_option_chain("SPY", "2026-06-30")
+    print_option_chain("SPY","2026-04-02")

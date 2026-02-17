@@ -89,13 +89,25 @@ def plot_risk_neutral_density(ticker, expiration_date, r=0.045,
         calls = calls[(calls['strike'] >= lower_bound) & (calls['strike'] <= upper_bound)]
         
         calls = calls.sort_values('strike')
+
+        # Enforce monotonicity: call prices must decrease as strike increases.                                                                                                                                               
+        # Violations indicate bad quotes from illiquid deep ITM options.                                                                                                                                                     
+        monotonic_mask = [True]  # keep the first row                                                                                                                                                                        
+        last_valid_price = calls['mid_price'].iloc[0]                                                                                                                                                                        
+        for price in calls['mid_price'].iloc[1:]:                                                                                                                                                                            
+            if price <= last_valid_price:                                                                                                                                                                                    
+                monotonic_mask.append(True)                                                                                                                                                                                  
+                last_valid_price = price                                                                                                                                                                                     
+            else:                                                                                                                                                                                                            
+                monotonic_mask.append(False)                                                                                                                                                                                 
+        calls = calls[monotonic_mask] 
         
-        if len(calls) < 10:
+        if len(calls) < 20:
             if plot:
                 print(f"Warning: Only {len(calls)} liquid options found. Results may be unreliable.")
-            if len(calls) < 5:
+            if len(calls) < 15:
                 if plot:
-                    print("Error: Not enough data points for reliable density estimation")
+                    print(f"Error: Only {len(calls)} data points — need at least 15 for reliable density estimation")
                 return
 
         if plot:
@@ -104,8 +116,11 @@ def plot_risk_neutral_density(ticker, expiration_date, r=0.045,
         strikes = calls['strike'].values
         prices = calls['mid_price'].values
         
-        # smoothness before taking second derivative
-        spline = UnivariateSpline(strikes, prices, s=smoothing_s)
+        # Scale smoothing with number of data points to avoid overfitting
+        # on dense monthly option chains (~80+ strikes) while preserving
+        # behavior on sparser weekly chains (~30 strikes)
+        adaptive_s = smoothing_s * len(strikes)
+        spline = UnivariateSpline(strikes, prices, s=adaptive_s)
         
         # Create uniform strike grid
         dK = 0.5  # $0.50 spacing for fine resolution
@@ -343,7 +358,7 @@ def plot_options_heatmap(ticker, r=0.045, min_oi=30, smoothing_s=0.1):
     ax.legend(loc='upper right', fontsize=10)
 
     ax.set_title(f'{ticker.upper()} Options-Implied Price Heatmap (Next 12 Weeks)\n'
-                 f'Red = High Probability | Green = Low Probability | Grey = No Data',
+                 f'Red = High Probability | Green = Low Probability | Grey = No Chain',
                  fontsize=13)
 
     cbar = fig.colorbar(im, ax=ax, pad=0.02)
@@ -356,7 +371,18 @@ def plot_options_heatmap(ticker, r=0.045, min_oi=30, smoothing_s=0.1):
 # Example usage
 if __name__ == "__main__":
 
-    #plot_risk_neutral_density()
+    #plot_risk_neutral_density("SPY","2026-78-03")
     plot_options_heatmap("SPY")
+
+    # SPY Expiration dates for reference:
+    # [2026-02-17, 2026-02-18, 2026-02-19, 2026-02-20, 
+    #  2026-02-23, 2026-02-24, 2026-02-25, 2026-02-26, 
+    #  2026-02-27, 2026-03-06, 2026-03-13, 2026-03-20, 
+    #  2026-03-27, 2026-03-31, 2026-04-02, 2026-04-17, 
+    #  2026-04-30, 2026-05-15, 2026-05-29, 2026-06-18, 
+    #  2026-06-30, 2026-07-31, 2026-08-21, 2026-09-18, 
+    #  2026-09-30, 2026-12-18, 2026-12-31, 2027-01-15, 
+    #  2027-03-19, 2027-06-17, 2027-12-17, 2028-01-21, 
+    #  2028-06-16, 2028-12-15]
 
 
