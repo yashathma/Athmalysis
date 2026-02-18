@@ -138,8 +138,8 @@ def plot_risk_neutral_density(ticker, expiration_date, r=0.045,
         density = np.maximum(density, 0)
         
         # Normalize to integrate to 1
-        # Use np.trapz for compatibility with older NumPy versions
-        total = np.trapz(density, K_grid)
+        trapz = np.trapezoid if hasattr(np, 'trapezoid') else np.trapz
+        total = trapz(density, K_grid)
         if total > 0:
             density = density / total
         
