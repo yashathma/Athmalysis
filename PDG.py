@@ -382,20 +382,28 @@ def plot_options_heatmap(ticker, r=0.045, min_oi=30, smoothing_s=0.1):
     ax.set_xticklabels(date_labels, fontsize=9, rotation=45, ha='right')
     ax.set_xlabel('Expiration Date', fontsize=12)
 
-    # Y-axis: price
+    # Y-axis: price on left, percentage change on right
     ax.set_ylabel('Stock Price ($)', fontsize=12)
 
+    ax2 = ax.twinx()
+    ax2.set_ylim(ax.get_ylim())
+    y_low, y_high = ax.get_ylim()
+    pct_ticks = np.arange(
+        np.floor(((y_low - current_price) / current_price) * 100 / 5) * 5,
+        np.ceil(((y_high - current_price) / current_price) * 100 / 5) * 5 + 1,
+        5
+    )
+    price_ticks = current_price * (1 + pct_ticks / 100)
+    ax2.set_yticks(price_ticks)
+    ax2.set_yticklabels([f'{p:+.0f}%' for p in pct_ticks], fontsize=9)
+    ax2.set_ylabel('Change from Current Price (%)', fontsize=12)
+
     # Current price horizontal line
-    ax.axhline(current_price, color='white', linestyle='--', linewidth=2,
-               label=f'Current: ${current_price:.2f}')
-    ax.legend(loc='upper right', fontsize=10)
+    ax.axhline(current_price, color='white', linestyle='--', linewidth=2)
 
     ax.set_title(f'{ticker.upper()} Options-Implied Price Heatmap (Next 12 Weeks)\n'
                  f'Red = High Probability | Green = Low Probability | Grey = No Chain',
                  fontsize=13)
-
-    cbar = fig.colorbar(im, ax=ax, pad=0.02)
-    cbar.set_label('Probability Density', fontsize=11)
 
     plt.tight_layout()
     plt.show()
