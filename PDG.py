@@ -334,6 +334,39 @@ def plot_options_heatmap(ticker, r=0.045, min_oi=30, smoothing_s=0.1):
             # Leave as NaN — will render as grey
             date_labels.append(f"{label}\n(N/A)")
 
+    # --- Horizontal interpolation for smooth transitions between weeks ---
+    upsample_factor = 10
+    n_prices, n_weeks = heatmap_data.shape
+    n_fine = (n_weeks - 1) * upsample_factor + 1
+    x_orig = np.arange(n_weeks, dtype=float)
+    x_fine = np.linspace(0, n_weeks - 1, n_fine)
+
+    upsampled = np.full((n_prices, n_fine), np.nan)
+
+    # Determine which columns have no data (all NaN)
+    col_nan = np.all(np.isnan(heatmap_data), axis=0)
+
+    # Build fine-grid NaN mask: each NaN column occupies its region
+    fine_nan_mask = np.zeros(n_fine, dtype=bool)
+    for i in range(n_weeks):
+        if col_nan[i]:
+            left = max(0, round((i - 0.5) * upsample_factor))
+            right = min(n_fine, round((i + 0.5) * upsample_factor))
+            fine_nan_mask[left:right] = True
+
+    # Interpolate each price row across valid weeks
+    for row_idx in range(n_prices):
+        row = heatmap_data[row_idx, :]
+        valid_mask = ~np.isnan(row)
+        if valid_mask.sum() >= 2:
+            upsampled[row_idx, :] = np.interp(x_fine, x_orig[valid_mask], row[valid_mask])
+            upsampled[row_idx, fine_nan_mask] = np.nan
+        elif valid_mask.sum() == 1:
+            idx = np.where(valid_mask)[0][0]
+            left = max(0, round((idx - 0.5) * upsample_factor))
+            right = min(n_fine, round((idx + 0.5) * upsample_factor))
+            upsampled[row_idx, left:right] = row[idx]
+
     # Custom green-to-red colormap (green = low prob, red = high prob)
     cmap = LinearSegmentedColormap.from_list('green_red',
         ['#1a9641', '#a6d96a', '#ffffbf', '#fdae61', '#d7191c'])
@@ -341,11 +374,11 @@ def plot_options_heatmap(ticker, r=0.045, min_oi=30, smoothing_s=0.1):
 
     fig, ax = plt.subplots(figsize=(16, 8))
 
-    im = ax.pcolormesh(np.arange(12), common_grid, heatmap_data,
+    im = ax.pcolormesh(x_fine, common_grid, upsampled,
                        cmap=cmap, shading='nearest')
 
     # X-axis: date labels
-    ax.set_xticks(np.arange(12))
+    ax.set_xticks(np.arange(n_weeks))
     ax.set_xticklabels(date_labels, fontsize=9, rotation=45, ha='right')
     ax.set_xlabel('Expiration Date', fontsize=12)
 
