@@ -96,12 +96,11 @@ struct NewsView: View {
 
                         Spacer().frame(height: 16)
 
-                        ScrollView {
-                            Text(currentArticle.summary)
-                                .font(.body)
-                                .foregroundStyle(Color(white: 0.85))
-                                .lineSpacing(4)
-                        }
+                        Text(currentArticle.summary)
+                            .font(.body)
+                            .foregroundStyle(Color(white: 0.85))
+                            .lineSpacing(4)
+                            .minimumScaleFactor(0.5)
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
