@@ -6,6 +6,8 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
+            Color.black.ignoresSafeArea()
+
             TabView(selection: $selectedTab) {
                 NavigationStack(path: $viewModel.watchlistNavPath) {
                     WatchlistView(selectedTab: $selectedTab)
@@ -18,7 +20,7 @@ struct ContentView: View {
                 }
                 .tabItem {
                     Image(systemName: "list.bullet")
-                    Text("LIST")
+                    Text("Watchlist")
                 }
                 .tag(0)
 
@@ -33,7 +35,7 @@ struct ContentView: View {
                 }
                 .tabItem {
                     Image(systemName: "newspaper")
-                    Text("NEWS")
+                    Text("News")
                 }
                 .tag(1)
 
@@ -47,15 +49,16 @@ struct ContentView: View {
                         }
                 }
                 .tabItem {
-                    Image(systemName: "chart.bar")
-                    Text("AI")
+                    Image(systemName: "chart.bar.fill")
+                    Text("Summary")
                 }
                 .tag(2)
             }
+            .tint(.white)
 
             // Loading overlay
             if viewModel.isLoadingStock || viewModel.isRefreshing {
-                Color.black.opacity(0.3)
+                Color.black.opacity(0.5)
                     .ignoresSafeArea()
                 ProgressView()
                     .scaleEffect(1.5)

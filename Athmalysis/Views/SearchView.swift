@@ -43,8 +43,9 @@ struct SearchView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Add to Watchlist")
-                .font(.title)
+                .font(.largeTitle)
                 .fontWeight(.bold)
+                .foregroundStyle(.white)
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
 
@@ -53,67 +54,83 @@ struct SearchView: View {
             // Search field
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search any stock ticker...", text: $searchQuery)
+                    .foregroundStyle(.gray)
+                TextField("Search stocks...", text: $searchQuery)
                     .textFieldStyle(.plain)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.characters)
+                    .foregroundStyle(.white)
 
                 if isSearching {
                     ProgressView()
                         .scaleEffect(0.8)
+                        .tint(.gray)
                 }
             }
             .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(white: 0.12))
             )
             .padding(.horizontal, 16)
             .onChange(of: searchQuery) { _, newValue in
                 debounceSearch(query: newValue)
             }
 
-            Spacer().frame(height: 16)
+            Spacer().frame(height: 20)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    // Yahoo Finance search results (shown when actively searching)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    // Yahoo Finance search results
                     if !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty && !filteredSearchResults.isEmpty {
-                        Text("Search Results")
-                            .font(.subheadline)
+                        Text("RESULTS")
+                            .font(.caption)
                             .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.gray)
                             .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
 
                         ForEach(filteredSearchResults) { result in
-                            SearchResultCard(
+                            SearchResultRow(
                                 symbol: result.symbol,
                                 name: result.name
                             ) {
                                 viewModel.addStock(result.symbol, name: result.name)
                             }
+
+                            if result.id != filteredSearchResults.last?.id {
+                                Divider()
+                                    .background(Color(white: 0.2))
+                                    .padding(.leading, 16)
+                            }
                         }
 
                         if !filteredSuggestions.isEmpty {
-                            Spacer().frame(height: 16)
+                            Spacer().frame(height: 24)
                         }
                     }
 
                     // Suggestions section
                     if !filteredSuggestions.isEmpty {
-                        Text(searchQuery.trimmingCharacters(in: .whitespaces).isEmpty ? "Suggestions" : "Suggested Matches")
-                            .font(.subheadline)
+                        Text(searchQuery.trimmingCharacters(in: .whitespaces).isEmpty ? "POPULAR" : "SUGGESTED")
+                            .font(.caption)
                             .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.gray)
                             .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
 
                         ForEach(filteredSuggestions, id: \.symbol) { stock in
-                            SearchResultCard(
+                            SearchResultRow(
                                 symbol: stock.symbol,
                                 name: stock.name
                             ) {
                                 viewModel.addStock(stock.symbol, name: stock.name)
+                            }
+
+                            if stock.symbol != filteredSuggestions.last?.symbol {
+                                Divider()
+                                    .background(Color(white: 0.2))
+                                    .padding(.leading, 16)
                             }
                         }
                     }
@@ -123,15 +140,15 @@ struct SearchView: View {
                         HStack {
                             Spacer()
                             Text("No stocks found")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.gray)
                                 .padding(32)
                             Spacer()
                         }
                     }
                 }
-                .padding(.horizontal, 16)
             }
         }
+        .background(Color.black)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -146,7 +163,6 @@ struct SearchView: View {
         }
 
         searchTask = Task {
-            // Debounce 300ms
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
 
@@ -167,35 +183,33 @@ struct SearchView: View {
     }
 }
 
-struct SearchResultCard: View {
+struct SearchResultRow: View {
     let symbol: String
     let name: String
     let onAdd: () -> Void
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(symbol)
                     .font(.headline)
                     .fontWeight(.bold)
+                    .foregroundStyle(.white)
                 Text(name)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.gray)
+                    .lineLimit(1)
             }
 
             Spacer()
 
             Button(action: onAdd) {
-                Image(systemName: "plus")
-                    .foregroundStyle(.blue)
-                    .frame(width: 44, height: 44)
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.green)
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
-        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 }

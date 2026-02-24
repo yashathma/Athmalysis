@@ -25,31 +25,33 @@ struct NewsView: View {
     var body: some View {
         VStack(spacing: 0) {
             if viewModel.watchlistStocks.isEmpty || stockSymbol.isEmpty {
-                // Empty state
                 Spacer()
-                Text("Your watchlist is empty.\nAdd stocks to get started!")
+                Text("Your watchlist is empty.\nAdd stocks to get started.")
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.gray)
                 Spacer()
             } else {
                 // Stock symbol header
                 Text(stockSymbol)
-                    .font(.title)
+                    .font(.largeTitle)
                     .fontWeight(.bold)
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
 
-                Spacer().frame(height: 16)
+                Spacer().frame(height: 8)
 
                 // Stock navigation indicators
                 HStack(spacing: 8) {
                     Image(systemName: "chevron.up")
-                        .foregroundStyle(currentStockIndex > 0 ? Color.accentColor : .gray)
-                    Text("Swipe up/down to change stocks")
+                        .font(.caption2)
+                        .foregroundStyle(currentStockIndex > 0 ? .white : Color(white: 0.3))
+                    Text("Swipe to change stocks")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.gray)
                     Image(systemName: "chevron.down")
-                        .foregroundStyle(currentStockIndex < viewModel.watchlistStocks.count - 1 ? Color.accentColor : .gray)
+                        .font(.caption2)
+                        .foregroundStyle(currentStockIndex < viewModel.watchlistStocks.count - 1 ? .white : Color(white: 0.3))
                 }
 
                 Spacer().frame(height: 16)
@@ -65,11 +67,16 @@ struct NewsView: View {
                                 .font(.title3)
                             Text("Generate AI Summary")
                                 .font(.title3)
+                                .fontWeight(.semibold)
                         }
+                        .foregroundStyle(.black)
                         .padding(.horizontal, 32)
                         .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.green)
+                        )
                     }
-                    .buttonStyle(.borderedProminent)
                     Spacer()
                 } else if !articles.isEmpty && currentArticleIndex < articles.count {
                     let currentArticle = articles[currentArticleIndex]
@@ -78,19 +85,21 @@ struct NewsView: View {
                         Text(currentArticle.title)
                             .font(.title3)
                             .fontWeight(.bold)
+                            .foregroundStyle(.white)
                             .lineSpacing(4)
 
-                        Spacer().frame(height: 12)
+                        Spacer().frame(height: 10)
 
-                        Text("\(currentArticle.publishedAt) by \(currentArticle.publisher)")
+                        Text("\(currentArticle.publishedAt) \u{00B7} \(currentArticle.publisher)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.gray)
 
                         Spacer().frame(height: 16)
 
                         ScrollView {
                             Text(currentArticle.summary)
                                 .font(.body)
+                                .foregroundStyle(Color(white: 0.85))
                                 .lineSpacing(4)
                         }
                     }
@@ -98,8 +107,7 @@ struct NewsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(.systemBackground))
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                            .fill(Color(white: 0.11))
                     )
                     .padding(.horizontal, 16)
                     .offset(x: dragOffset.width)
@@ -107,7 +115,7 @@ struct NewsView: View {
                 } else {
                     Spacer()
                     Text("No articles available")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.gray)
                     Spacer()
                 }
 
@@ -116,33 +124,34 @@ struct NewsView: View {
                 // Gesture instructions
                 HStack(spacing: 32) {
                     HStack(spacing: 4) {
-                        Image(systemName: "hand.point.left")
-                            .font(.caption)
+                        Image(systemName: "arrow.left")
+                            .font(.caption2)
                         Text("Skip")
                             .font(.caption)
                     }
-                    .foregroundStyle(Color(red: 0.96, green: 0.26, blue: 0.21))
+                    .foregroundStyle(.red)
 
                     HStack(spacing: 4) {
-                        Image(systemName: "hand.point.right")
-                            .font(.caption)
                         Text("Include")
                             .font(.caption)
+                        Image(systemName: "arrow.right")
+                            .font(.caption2)
                     }
-                    .foregroundStyle(Color(red: 0.3, green: 0.69, blue: 0.31))
+                    .foregroundStyle(.green)
                 }
 
                 // Article counter
                 if !articles.isEmpty && !showEndMessage {
                     Text("\(currentArticleIndex + 1) of \(articles.count)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.gray)
                         .padding(.top, 4)
                 }
 
                 Spacer().frame(height: 8)
             }
         }
+        .background(Color.black)
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
@@ -154,15 +163,12 @@ struct NewsView: View {
                     let vertical = value.translation.height
 
                     if abs(vertical) > abs(horizontal) && abs(vertical) > 100 {
-                        // Vertical swipe - change stock
                         if vertical > 0 {
-                            // Swipe down - previous stock
                             if currentStockIndex > 0 {
                                 currentStockIndex -= 1
                                 viewModel.selectedStock = viewModel.watchlistStocks[currentStockIndex]
                             }
                         } else {
-                            // Swipe up - next stock
                             if currentStockIndex < viewModel.watchlistStocks.count - 1 {
                                 currentStockIndex += 1
                                 viewModel.selectedStock = viewModel.watchlistStocks[currentStockIndex]
@@ -171,7 +177,6 @@ struct NewsView: View {
                     } else if abs(horizontal) > abs(vertical) && abs(horizontal) > 100 {
                         if !showEndMessage {
                             if horizontal > 0 {
-                                // Swipe right - include article
                                 if !articles.isEmpty && currentArticleIndex < articles.count {
                                     let currentArticle = articles[currentArticleIndex]
                                     viewModel.swipeArticle(stockSymbol: stockSymbol, articleId: currentArticle.id)
@@ -183,7 +188,6 @@ struct NewsView: View {
                                     }
                                 }
                             } else {
-                                // Swipe left - skip article
                                 if !articles.isEmpty {
                                     if currentArticleIndex == articles.count - 1 {
                                         viewModel.markEndMessageShown(stockSymbol: stockSymbol)

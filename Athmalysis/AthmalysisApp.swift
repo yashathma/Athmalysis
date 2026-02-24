@@ -8,6 +8,7 @@ struct AthmalysisApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(viewModel)
+                .preferredColorScheme(.dark)
         }
     }
 }
