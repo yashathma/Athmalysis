@@ -19,19 +19,7 @@ struct WatchlistView: View {
                 Spacer()
 
                 Button(action: {
-                    viewModel.refreshPrices()
-                }) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.title3)
-                }
-                .disabled(viewModel.isRefreshing || viewModel.watchlistStocks.isEmpty)
-
-                Button(action: {
-                    if viewModel.watchlistStocks.count >= viewModel.maxWatchlistSize {
-                        viewModel.errorMessage = "Maximum \(viewModel.maxWatchlistSize) stocks allowed in watchlist"
-                    } else {
-                        viewModel.watchlistNavPath.append(WatchlistRoute.search)
-                    }
+                    viewModel.watchlistNavPath.append(WatchlistRoute.search)
                 }) {
                     Image(systemName: "magnifyingglass")
                         .font(.title3)
@@ -69,6 +57,12 @@ struct WatchlistView: View {
             }
         }
         .navigationBarHidden(true)
+        .onAppear {
+            viewModel.startAutoRefresh()
+        }
+        .onDisappear {
+            viewModel.stopAutoRefresh()
+        }
     }
 }
 

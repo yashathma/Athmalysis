@@ -19,6 +19,7 @@
 		B1000000000000000000000A /* AISummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000A /* AISummaryView.swift */; };
 		B1000000000000000000000B /* DetailedAISummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000B /* DetailedAISummaryView.swift */; };
 		B1000000000000000000000C /* DataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000C /* DataManager.swift */; };
+		B10000000000000000000010 /* YahooFinanceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* YahooFinanceService.swift */; };
 		B1000000000000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000D /* Assets.xcassets */; };
 		B1000000000000000000000F /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000F /* Preview Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -36,6 +37,7 @@
 		A1000000000000000000000A /* AISummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISummaryView.swift; sourceTree = "<group>"; };
 		A1000000000000000000000B /* DetailedAISummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailedAISummaryView.swift; sourceTree = "<group>"; };
 		A1000000000000000000000C /* DataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataManager.swift; sourceTree = "<group>"; };
+		A10000000000000000000010 /* YahooFinanceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YahooFinanceService.swift; sourceTree = "<group>"; };
 		A1000000000000000000000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000000000000000000000E /* Athmalysis.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Athmalysis.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000000000000000000000F /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -89,6 +91,7 @@
 			children = (
 				A10000000000000000000004 /* AlphaVantageService.swift */,
 				A10000000000000000000005 /* ApiKeyManager.swift */,
+				A10000000000000000000010 /* YahooFinanceService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -219,6 +222,7 @@
 				B1000000000000000000000A /* AISummaryView.swift in Sources */,
 				B1000000000000000000000B /* DetailedAISummaryView.swift in Sources */,
 				B1000000000000000000000C /* DataManager.swift in Sources */,
+				B10000000000000000000010 /* YahooFinanceService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

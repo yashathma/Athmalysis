@@ -12,47 +12,6 @@ class AlphaVantageService {
         session = URLSession(configuration: config)
     }
 
-    // MARK: - Fetch Stock Data
-
-    func fetchStockData(symbol: String, attemptCount: Int = 0) async throws -> Stock {
-        if attemptCount >= ApiKeyManager.shared.totalKeys {
-            throw ServiceError.rateLimitExhausted
-        }
-
-        let apiKey = ApiKeyManager.shared.getNextKey()
-        var components = URLComponents(string: baseURL)!
-        components.queryItems = [
-            URLQueryItem(name: "function", value: "GLOBAL_QUOTE"),
-            URLQueryItem(name: "symbol", value: symbol),
-            URLQueryItem(name: "apikey", value: apiKey)
-        ]
-
-        let (data, _) = try await session.data(from: components.url!)
-        let response = try JSONDecoder().decode(GlobalQuoteResponse.self, from: data)
-
-        // Check rate limit
-        if response.information != nil || response.note != nil {
-            return try await fetchStockData(symbol: symbol, attemptCount: attemptCount + 1)
-        }
-
-        guard let quote = response.globalQuote else {
-            throw ServiceError.noData(symbol)
-        }
-
-        let price = Double(quote.price) ?? 0.0
-        let change = Double(quote.change) ?? 0.0
-        let percentStr = quote.changePercent.replacingOccurrences(of: "%", with: "")
-        let percent = Double(percentStr) ?? 0.0
-
-        return Stock(
-            symbol: quote.symbol,
-            name: Self.getStockName(quote.symbol),
-            currentPrice: price,
-            priceChange: change,
-            percentageChange: percent
-        )
-    }
-
     // MARK: - Fetch News
 
     func fetchNews(symbol: String, attemptCount: Int = 0) async throws -> [NewsArticle] {
@@ -89,32 +48,6 @@ class AlphaVantageService {
         }
     }
 
-    // MARK: - Fetch Stock and News Combined
-
-    func fetchStockAndNews(symbol: String) async throws -> (Stock, [NewsArticle]) {
-        // Fetch news first
-        let news = try await fetchNews(symbol: symbol)
-
-        if news.isEmpty {
-            throw ServiceError.noNews(symbol)
-        }
-
-        // Only fetch stock data if news is available
-        let stock = try await fetchStockData(symbol: symbol)
-        return (stock, news)
-    }
-
-    // MARK: - Refresh Multiple Stock Prices
-
-    func refreshStockPrices(symbols: [String]) async throws -> [Stock] {
-        var stocks: [Stock] = []
-        for symbol in symbols {
-            let stock = try await fetchStockData(symbol: symbol)
-            stocks.append(stock)
-        }
-        return stocks
-    }
-
     // MARK: - Helpers
 
     static func formatTimeAgo(_ timestamp: String?) -> String {
@@ -142,25 +75,6 @@ class AlphaVantageService {
             return "\(minutes) minute\(minutes > 1 ? "s" : "") ago"
         } else {
             return "Just now"
-        }
-    }
-
-    static func getStockName(_ symbol: String) -> String {
-        switch symbol {
-        case "NVDA": return "NVIDIA Corporation"
-        case "TSM": return "Taiwan Semiconductor"
-        case "QQQ": return "Invesco QQQ Trust"
-        case "AAPL": return "Apple Inc."
-        case "MSFT": return "Microsoft Corporation"
-        case "GOOGL": return "Alphabet Inc."
-        case "AMZN": return "Amazon.com Inc."
-        case "META": return "Meta Platforms Inc."
-        case "TSLA": return "Tesla Inc."
-        case "NFLX": return "Netflix Inc."
-        case "CRM": return "Salesforce Inc."
-        case "INTC": return "Intel Corporation"
-        case "AMD": return "Advanced Micro Devices"
-        default: return symbol
         }
     }
 }

@@ -37,8 +37,9 @@ class AppViewModel: ObservableObject {
     @Published var isRefreshing = false
     @Published var errorMessage: String? = nil
 
-    let maxWatchlistSize = 3
-    private let service = AlphaVantageService.shared
+    private let yahooService = YahooFinanceService.shared
+    private let newsService = AlphaVantageService.shared
+    private var refreshTimer: Timer?
 
     // MARK: - Init
 
@@ -55,16 +56,24 @@ class AppViewModel: ObservableObject {
 
     // MARK: - Actions
 
-    func addStock(_ symbol: String) {
-        guard !watchlistStocks.contains(symbol),
-              watchlistStocks.count < maxWatchlistSize else { return }
+    func addStock(_ symbol: String, name: String? = nil) {
+        guard !watchlistStocks.contains(symbol) else { return }
 
         isLoadingStock = true
         errorMessage = nil
 
         Task {
             do {
-                let (stock, news) = try await service.fetchStockAndNews(symbol: symbol)
+                // Fetch price from Yahoo Finance
+                let stock = try await yahooService.fetchStockData(symbol: symbol, name: name)
+
+                // Fetch news from Alpha Vantage
+                let news = try await newsService.fetchNews(symbol: symbol)
+
+                if news.isEmpty {
+                    throw ServiceError.noNews(symbol)
+                }
+
                 watchlistStocks.append(symbol)
                 stockDataMap[symbol] = stock
                 newsDataMap[symbol] = news
@@ -108,19 +117,69 @@ class AppViewModel: ObservableObject {
 
         Task {
             do {
-                let stocks = try await service.refreshStockPrices(symbols: watchlistStocks)
+                let stocks = try await yahooService.refreshStockPrices(
+                    symbols: watchlistStocks,
+                    stockDataMap: stockDataMap
+                )
                 for stock in stocks {
                     stockDataMap[stock.symbol] = stock
                 }
             } catch {
-                let msg = error.localizedDescription
-                if msg.contains("rate limit") {
-                    errorMessage = "API key limit reached. Please try again later."
-                } else {
-                    errorMessage = "Failed to refresh: \(msg)"
-                }
+                errorMessage = "Failed to refresh: \(error.localizedDescription)"
             }
             isRefreshing = false
+        }
+    }
+
+    // MARK: - Auto-Refresh
+
+    private var isUSMarketOpen: Bool {
+        let now = Date()
+        let eastern = TimeZone(identifier: "America/New_York")!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = eastern
+
+        let weekday = calendar.component(.weekday, from: now)
+        // 1 = Sunday, 7 = Saturday
+        guard weekday >= 2 && weekday <= 6 else { return false }
+
+        let hour = calendar.component(.hour, from: now)
+        let minute = calendar.component(.minute, from: now)
+        let totalMinutes = hour * 60 + minute
+        // 9:30 AM = 570 min, 4:00 PM = 960 min
+        return totalMinutes >= 570 && totalMinutes <= 960
+    }
+
+    func startAutoRefresh() {
+        stopAutoRefresh()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                guard !self.watchlistStocks.isEmpty, self.isUSMarketOpen else { return }
+                self.silentRefreshPrices()
+            }
+        }
+    }
+
+    func stopAutoRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+
+    private func silentRefreshPrices() {
+        guard !watchlistStocks.isEmpty else { return }
+        Task {
+            do {
+                let stocks = try await yahooService.refreshStockPrices(
+                    symbols: watchlistStocks,
+                    stockDataMap: stockDataMap
+                )
+                for stock in stocks {
+                    stockDataMap[stock.symbol] = stock
+                }
+            } catch {
+                // Silent refresh — don't show errors to user
+            }
         }
     }
 

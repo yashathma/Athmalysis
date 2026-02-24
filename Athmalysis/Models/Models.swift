@@ -28,33 +28,50 @@ struct AISummary: Codable {
     let generatedAt: String
 }
 
-// MARK: - Alpha Vantage API Response Models
+// MARK: - Yahoo Finance API Response Models
 
-struct GlobalQuoteResponse: Codable {
-    let globalQuote: GlobalQuote?
-    let information: String?
-    let note: String?
-
-    enum CodingKeys: String, CodingKey {
-        case globalQuote = "Global Quote"
-        case information = "Information"
-        case note = "Note"
-    }
+struct YahooChartResponse: Codable {
+    let chart: YahooChart?
 }
 
-struct GlobalQuote: Codable {
-    let symbol: String
-    let price: String
-    let change: String
-    let changePercent: String
-
-    enum CodingKeys: String, CodingKey {
-        case symbol = "01. symbol"
-        case price = "05. price"
-        case change = "09. change"
-        case changePercent = "10. change percent"
-    }
+struct YahooChart: Codable {
+    let result: [YahooChartResult]?
+    let error: YahooError?
 }
+
+struct YahooChartResult: Codable {
+    let meta: YahooMeta?
+}
+
+struct YahooMeta: Codable {
+    let symbol: String?
+    let regularMarketPrice: Double?
+    let previousClose: Double?
+    let chartPreviousClose: Double?
+    let regularMarketDayHigh: Double?
+    let regularMarketDayLow: Double?
+    let shortName: String?
+    let longName: String?
+}
+
+struct YahooError: Codable {
+    let code: String?
+    let description: String?
+}
+
+struct YahooSearchResponse: Codable {
+    let quotes: [YahooQuote]?
+}
+
+struct YahooQuote: Codable {
+    let symbol: String?
+    let shortname: String?
+    let longname: String?
+    let quoteType: String?
+    let exchange: String?
+}
+
+// MARK: - Alpha Vantage API Response Models (News only)
 
 struct NewsSentimentResponse: Codable {
     let feed: [NewsItem]?
