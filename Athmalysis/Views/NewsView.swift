@@ -31,8 +31,8 @@ struct NewsView: View {
                     .foregroundStyle(.gray)
                 Spacer()
             } else {
-                // Stock symbol header
-                Text(stockSymbol)
+                // Stock name header
+                Text(viewModel.stockDataMap[stockSymbol]?.name ?? stockSymbol)
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
@@ -82,11 +82,23 @@ struct NewsView: View {
                     let currentArticle = articles[currentArticleIndex]
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(currentArticle.title)
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.white)
-                            .lineSpacing(4)
+                        if let urlString = currentArticle.url, let url = URL(string: urlString) {
+                            Text(currentArticle.title)
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.blue)
+                                .lineSpacing(4)
+                                .underline()
+                                .onTapGesture {
+                                    UIApplication.shared.open(url)
+                                }
+                        } else {
+                            Text(currentArticle.title)
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.white)
+                                .lineSpacing(4)
+                        }
 
                         Spacer().frame(height: 10)
 

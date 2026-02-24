@@ -27,7 +27,16 @@ class AlphaVantageService {
             URLQueryItem(name: "apikey", value: apiKey)
         ]
 
-        let (data, _) = try await session.data(from: components.url!)
+        print("[AV] Fetching news: \(components.url!.absoluteString)")
+        let (data, urlResponse) = try await session.data(from: components.url!)
+        if let httpResponse = urlResponse as? HTTPURLResponse {
+            print("[AV] Status: \(httpResponse.statusCode)")
+        }
+
+        if let raw = String(data: data, encoding: .utf8) {
+            print("[AV] Response: \(raw)")
+        }
+
         let response = try JSONDecoder().decode(NewsSentimentResponse.self, from: data)
 
         // Check rate limit
@@ -43,7 +52,8 @@ class AlphaVantageService {
                 summary: item.summary ?? "No summary available",
                 publishedAt: Self.formatTimeAgo(item.timePublished),
                 publisher: item.source ?? "Unknown Publisher",
-                stockSymbol: symbol
+                stockSymbol: symbol,
+                url: item.url
             )
         }
     }

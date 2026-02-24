@@ -18,6 +18,7 @@ struct NewsArticle: Codable, Identifiable {
     let publishedAt: String
     let publisher: String
     let stockSymbol: String
+    let url: String?
 }
 
 struct AISummary: Codable {
