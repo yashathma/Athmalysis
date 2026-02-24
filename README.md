@@ -1,1 +1,1 @@
-Developer tools are shared for public use, should be pretty straight forward to use. Athmalysis strategy and weighting is not.
+Here's a starter pack to build ur own algorithm using Alpca API's, don't lose money!!
