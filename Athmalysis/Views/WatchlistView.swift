@@ -3,6 +3,7 @@ import SwiftUI
 struct WatchlistView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Binding var selectedTab: Int
+    @State private var activeSwipeID: String?
 
     private var displayStocks: [Stock] {
         viewModel.watchlistStocks.compactMap { viewModel.stockDataMap[$0] }
@@ -46,17 +47,19 @@ struct WatchlistView: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(displayStocks) { stock in
-                            StockRow(stock: stock) {
+                            StockRow(stock: stock, activeSwipeID: $activeSwipeID) {
                                 viewModel.selectedStock = stock.symbol
                                 selectedTab = 1
                             } onRemove: {
-                                viewModel.removeStock(stock.symbol)
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                    viewModel.removeStock(stock.symbol)
+                                }
                             }
 
                             if stock.id != displayStocks.last?.id {
                                 Divider()
                                     .background(Color(white: 0.2))
-                                    .padding(.leading, 60)
+                                    .padding(.horizontal, 4)
                             }
                         }
                     }
@@ -77,13 +80,40 @@ struct WatchlistView: View {
 
 struct StockRow: View {
     let stock: Stock
+    @Binding var activeSwipeID: String?
     let onClick: () -> Void
     let onRemove: () -> Void
 
-    @State private var showDelete = false
+    @State private var offset: CGFloat = 0
+    private let trashWidth: CGFloat = 70
+
+    private var isRevealed: Bool {
+        activeSwipeID == stock.symbol
+    }
 
     var body: some View {
-        Button(action: onClick) {
+        ZStack(alignment: .trailing) {
+            // Trash button behind the row
+            if offset < 0 || isRevealed {
+                Button {
+                    onRemove()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: trashWidth)
+                    .frame(maxHeight: .infinity)
+                }
+                .padding(.vertical, 12)
+                .transition(.move(edge: .trailing))
+            }
+
+            // Main row content
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(stock.symbol)
@@ -117,15 +147,63 @@ struct StockRow: View {
                 }
             }
             .padding(.vertical, 12)
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive, action: onRemove) {
-                Label("Delete", systemImage: "trash")
+            .background(Color.black)
+            .offset(x: offset)
+            .gesture(
+                DragGesture(minimumDistance: 20)
+                    .onChanged { value in
+                        let horizontal = value.translation.width
+                        if isRevealed {
+                            let newOffset = -trashWidth + horizontal
+                            offset = min(0, max(-trashWidth, newOffset))
+                        } else {
+                            if horizontal < 0 {
+                                // Close any other revealed row when this one starts swiping
+                                if activeSwipeID != nil {
+                                    activeSwipeID = nil
+                                }
+                                offset = max(-trashWidth, horizontal)
+                            }
+                        }
+                    }
+                    .onEnded { value in
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            if isRevealed {
+                                if value.translation.width > trashWidth * 0.3 {
+                                    offset = 0
+                                    activeSwipeID = nil
+                                } else {
+                                    offset = -trashWidth
+                                }
+                            } else {
+                                if -value.translation.width > trashWidth * 0.4 {
+                                    offset = -trashWidth
+                                    activeSwipeID = stock.symbol
+                                } else {
+                                    offset = 0
+                                }
+                            }
+                        }
+                    }
+            )
+            .onTapGesture {
+                if isRevealed {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        offset = 0
+                        activeSwipeID = nil
+                    }
+                } else {
+                    onClick()
+                }
             }
         }
-        .contextMenu {
-            Button(role: .destructive, action: onRemove) {
-                Label("Remove from Watchlist", systemImage: "trash")
+        .clipped()
+        .onChange(of: activeSwipeID) { _, newValue in
+            // Another row became active — close this one
+            if newValue != stock.symbol && offset != 0 {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    offset = 0
+                }
             }
         }
     }
