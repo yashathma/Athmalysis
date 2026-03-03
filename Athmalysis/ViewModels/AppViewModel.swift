@@ -109,6 +109,15 @@ class AppViewModel: ObservableObject {
         }
     }
 
+    func moveStock(from source: Int, to destination: Int) {
+        guard source != destination,
+              source >= 0, source < watchlistStocks.count,
+              destination >= 0, destination < watchlistStocks.count else { return }
+
+        let movedStock = watchlistStocks.remove(at: source)
+        watchlistStocks.insert(movedStock, at: destination)
+    }
+
     func refreshPrices() {
         guard !watchlistStocks.isEmpty else { return }
 
