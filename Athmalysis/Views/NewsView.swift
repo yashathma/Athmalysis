@@ -7,6 +7,11 @@ struct NewsView: View {
     @State private var dragOffset: CGSize = .zero
     @State private var verticalDragOffset: CGFloat = 0
 
+    // Filter out closed stocks for smooth scrolling
+    private var visibleStocks: [String] {
+        viewModel.watchlistStocks.filter { !viewModel.closedStocks.contains($0) }
+    }
+
     private var stockSymbol: String {
         viewModel.selectedStock
     }
@@ -27,7 +32,7 @@ struct NewsView: View {
         GeometryReader { geometry in
             ZStack {
                 // Show current stock and adjacent stocks for smooth transitions
-                ForEach(Array(viewModel.watchlistStocks.enumerated()), id: \.element) { index, symbol in
+                ForEach(Array(visibleStocks.enumerated()), id: \.element) { index, symbol in
                     if abs(index - currentStockIndex) <= 1 {
                         stockContentView(for: symbol, at: index, screenHeight: geometry.size.height)
                     }
@@ -57,17 +62,17 @@ struct NewsView: View {
                     let vertical = value.translation.height
 
                     if abs(vertical) > abs(horizontal) && abs(vertical) > 100 {
-                        // Stock switching
+                        // Stock switching (only visible stocks, smooth!)
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             if vertical > 0 {
                                 if currentStockIndex > 0 {
                                     currentStockIndex -= 1
-                                    viewModel.selectedStock = viewModel.watchlistStocks[currentStockIndex]
+                                    viewModel.selectedStock = visibleStocks[currentStockIndex]
                                 }
                             } else {
-                                if currentStockIndex < viewModel.watchlistStocks.count - 1 {
+                                if currentStockIndex < visibleStocks.count - 1 {
                                     currentStockIndex += 1
-                                    viewModel.selectedStock = viewModel.watchlistStocks[currentStockIndex]
+                                    viewModel.selectedStock = visibleStocks[currentStockIndex]
                                 }
                             }
                             verticalDragOffset = 0
@@ -90,7 +95,9 @@ struct NewsView: View {
                                         viewModel.swipeArticle(stockSymbol: stockSymbol, articleId: currentArticle.id)
 
                                         if currentArticleIndex == articles.count - 1 {
+                                            // Last article swiped - close stock and move to next
                                             viewModel.markEndMessageShown(stockSymbol: stockSymbol)
+                                            closeStockAndMoveToNext()
                                         } else {
                                             viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
                                         }
@@ -98,7 +105,8 @@ struct NewsView: View {
                                 } else {
                                     if !articles.isEmpty {
                                         if currentArticleIndex == articles.count - 1 {
-                                            viewModel.markEndMessageShown(stockSymbol: stockSymbol)
+                                            // Last article skipped - close stock and move to next
+                                            closeStockAndMoveToNext()
                                         } else {
                                             viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
                                         }
@@ -121,13 +129,61 @@ struct NewsView: View {
         )
         .navigationBarHidden(true)
         .onAppear {
-            if let idx = viewModel.watchlistStocks.firstIndex(of: stockSymbol) {
+            // Use visible stocks only
+            if let idx = visibleStocks.firstIndex(of: stockSymbol) {
                 currentStockIndex = idx
+            } else if !visibleStocks.isEmpty {
+                // If selected stock is closed or not found, go to first visible stock
+                currentStockIndex = 0
+                viewModel.selectedStock = visibleStocks[0]
             }
         }
         .onChange(of: viewModel.selectedStock) { _, newValue in
-            if let idx = viewModel.watchlistStocks.firstIndex(of: newValue) {
+            if let idx = visibleStocks.firstIndex(of: newValue) {
                 currentStockIndex = idx
+            }
+        }
+    }
+
+    private func closeStockAndMoveToNext() {
+        let closingIndex = currentStockIndex
+        let closingSymbol = stockSymbol
+        let hasStockBelow = closingIndex < visibleStocks.count - 1
+
+        // Check what the list looks like after closing
+        let updatedStocks = viewModel.watchlistStocks.filter {
+            !viewModel.closedStocks.contains($0) && $0 != closingSymbol
+        }
+
+        if updatedStocks.isEmpty {
+            viewModel.closedStocks.insert(closingSymbol)
+            return
+        }
+
+        if hasStockBelow {
+            // Stock below bounces UP: animate scroll down first, then remove
+            let nextSymbol = visibleStocks[closingIndex + 1]
+
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                currentStockIndex = closingIndex + 1
+                viewModel.selectedStock = nextSymbol
+            }
+
+            // After animation finishes, close the stock and fix the index
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                viewModel.closedStocks.insert(closingSymbol)
+                // Fix index: the list shifted, recalculate position
+                if let newIdx = self.visibleStocks.firstIndex(of: nextSymbol) {
+                    self.currentStockIndex = newIdx
+                }
+            }
+        } else {
+            // Last stock: stock above bounces DOWN
+            let targetIndex = min(closingIndex, updatedStocks.count - 1)
+            viewModel.closedStocks.insert(closingSymbol)
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                currentStockIndex = targetIndex
+                viewModel.selectedStock = updatedStocks[targetIndex]
             }
         }
     }
@@ -187,7 +243,7 @@ struct NewsView: View {
         let showEndMessage = viewModel.endMessageShownForStocks.contains(symbol)
 
         VStack(spacing: 0) {
-            if viewModel.watchlistStocks.isEmpty || symbol.isEmpty {
+            if visibleStocks.isEmpty || symbol.isEmpty {
                 Spacer()
                 Text("Your watchlist is empty.\nAdd stocks to get started.")
                     .multilineTextAlignment(.center)
@@ -214,7 +270,7 @@ struct NewsView: View {
                         .foregroundStyle(.gray)
                     Image(systemName: "chevron.down")
                         .font(.caption2)
-                        .foregroundStyle(currentStockIndex < viewModel.watchlistStocks.count - 1 ? .white : Color(white: 0.3))
+                        .foregroundStyle(currentStockIndex < visibleStocks.count - 1 ? .white : Color(white: 0.3))
                 }
 
                 Spacer().frame(height: 16)

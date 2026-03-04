@@ -31,6 +31,9 @@ class AppViewModel: ObservableObject {
     @Published var endMessageShownForStocks: Set<String> {
         didSet { DataManager.shared.saveEndMessageShown(endMessageShownForStocks) }
     }
+    @Published var closedStocks: Set<String> {
+        didSet { DataManager.shared.saveClosedStocks(closedStocks) }
+    }
 
     // MARK: - Fetch Tracking
     @Published var lastNewsFetchDate: [String: Date] {
@@ -60,6 +63,7 @@ class AppViewModel: ObservableObject {
         self.swipedArticles = dm.loadSwipedArticles()
         self.articleIndexPerStock = dm.loadArticleIndex()
         self.endMessageShownForStocks = dm.loadEndMessageShown()
+        self.closedStocks = dm.loadClosedStocks()
         self.lastNewsFetchDate = dm.loadLastNewsFetchDate()
         self.lastPriceFetchDate = dm.loadLastPriceFetchDate()
     }
@@ -112,6 +116,7 @@ class AppViewModel: ObservableObject {
         swipedArticles.removeValue(forKey: symbol)
         articleIndexPerStock.removeValue(forKey: symbol)
         endMessageShownForStocks.remove(symbol)
+        closedStocks.remove(symbol)
         stockDataMap.removeValue(forKey: symbol)
         newsDataMap.removeValue(forKey: symbol)
         lastNewsFetchDate.removeValue(forKey: symbol)
@@ -264,16 +269,43 @@ class AppViewModel: ObservableObject {
     private func refreshNewsForStock(_ symbol: String) {
         Task {
             do {
-                let news = try await newsService.fetchNews(symbol: symbol)
+                let allNews = try await newsService.fetchNews(symbol: symbol)
 
-                if !news.isEmpty {
-                    // Replace news articles on news page
-                    newsDataMap[symbol] = news
+                // Get swiped article URLs to exclude them from new articles
+                let swipedArticleIds = swipedArticles[symbol] ?? []
+                let existingArticles = newsDataMap[symbol] ?? []
+
+                // Create a set of URLs/titles from swiped articles for matching
+                let swipedURLs = Set(existingArticles
+                    .filter { swipedArticleIds.contains($0.id) }
+                    .compactMap { $0.url })
+
+                let swipedTitles = Set(existingArticles
+                    .filter { swipedArticleIds.contains($0.id) }
+                    .map { $0.title })
+
+                // Filter out articles that match swiped ones (by URL or title)
+                let filteredNews = allNews.filter { article in
+                    // Exclude if URL matches a swiped article
+                    if let url = article.url, swipedURLs.contains(url) {
+                        return false
+                    }
+                    // Exclude if title matches a swiped article
+                    if swipedTitles.contains(article.title) {
+                        return false
+                    }
+                    return true
+                }
+
+                if !filteredNews.isEmpty {
+                    // Replace news articles on news page with filtered list
+                    newsDataMap[symbol] = filteredNews
                     lastNewsFetchDate[symbol] = Date()
 
-                    // Reset article index for this stock since we have new articles
+                    // Reset article index and reopen stock since we have new articles
                     articleIndexPerStock[symbol] = 0
                     endMessageShownForStocks.remove(symbol)
+                    closedStocks.remove(symbol)  // Reopen the stock
 
                     // Note: swipedArticles[symbol] is NOT cleared - those persist until stock is removed
                 }

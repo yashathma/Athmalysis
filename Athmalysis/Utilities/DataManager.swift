@@ -13,6 +13,7 @@ class DataManager {
         static let swipedArticles = "swiped_articles"
         static let articleIndex = "article_index_per_stock"
         static let endMessageShown = "end_message_shown_stocks"
+        static let closedStocks = "closed_stocks"
         static let selectedStock = "selected_stock"
         static let lastNewsFetchDate = "last_news_fetch_date"
         static let lastPriceFetchDate = "last_price_fetch_date"
@@ -119,6 +120,23 @@ class DataManager {
         return Set(array)
     }
 
+    // MARK: - Closed Stocks
+
+    func saveClosedStocks(_ stocks: Set<String>) {
+        let array = Array(stocks)
+        if let data = try? encoder.encode(array) {
+            defaults.set(data, forKey: Keys.closedStocks)
+        }
+    }
+
+    func loadClosedStocks() -> Set<String> {
+        guard let data = defaults.data(forKey: Keys.closedStocks),
+              let array = try? decoder.decode([String].self, from: data) else {
+            return []
+        }
+        return Set(array)
+    }
+
     // MARK: - Selected Stock
 
     func saveSelectedStock(_ stock: String) {
@@ -170,6 +188,7 @@ class DataManager {
         var swiped = loadSwipedArticles()
         var index = loadArticleIndex()
         var endMsg = loadEndMessageShown()
+        var closed = loadClosedStocks()
         var newsFetchDate = loadLastNewsFetchDate()
 
         stockData.removeValue(forKey: symbol)
@@ -177,6 +196,7 @@ class DataManager {
         swiped.removeValue(forKey: symbol)
         index.removeValue(forKey: symbol)
         endMsg.remove(symbol)
+        closed.remove(symbol)
         newsFetchDate.removeValue(forKey: symbol)
 
         saveStockData(stockData)
@@ -184,6 +204,7 @@ class DataManager {
         saveSwipedArticles(swiped)
         saveArticleIndex(index)
         saveEndMessageShown(endMsg)
+        saveClosedStocks(closed)
         saveLastNewsFetchDate(newsFetchDate)
     }
 }

@@ -8,6 +8,8 @@ struct WatchlistView: View {
     @State private var draggingFromIndex: Int?
     @State private var draggingToIndex: Int?
     @State private var dragOffset: CGFloat = 0
+    @State private var showClosedStockAlert = false
+    @State private var closedStockSymbol = ""
 
     private var displayStocks: [Stock] {
         viewModel.watchlistStocks.compactMap { viewModel.stockDataMap[$0] }
@@ -76,8 +78,13 @@ struct WatchlistView: View {
                                         dragOffset = 0
                                     },
                                     onClick: {
-                                        viewModel.selectedStock = stock.symbol
-                                        selectedTab = 1
+                                        if viewModel.closedStocks.contains(stock.symbol) {
+                                            closedStockSymbol = stock.symbol
+                                            showClosedStockAlert = true
+                                        } else {
+                                            viewModel.selectedStock = stock.symbol
+                                            selectedTab = 1
+                                        }
                                     },
                                     onRemove: {
                                         withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
@@ -101,6 +108,11 @@ struct WatchlistView: View {
         }
         .background(Color.black)
         .navigationBarHidden(true)
+        .alert("All Articles Read", isPresented: $showClosedStockAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You've read all the articles for \(closedStockSymbol). New articles will be available tomorrow!")
+        }
         .onAppear {
             viewModel.startAutoRefresh()
         }
@@ -167,12 +179,18 @@ struct StockRow: View {
     let onRemove: () -> Void
 
     @State private var swipeOffset: CGFloat = 0
-    @GestureState private var isDetectingLongPress = false
 
     private let trashWidth: CGFloat = 70
 
     private var isRevealed: Bool {
         activeSwipeID == stock.symbol
+    }
+
+    private var priceChangeText: String {
+        let sign = stock.isPositive ? "+" : ""
+        let change = String(format: "%.2f", stock.priceChange)
+        let pct = String(format: "%.2f", stock.percentageChange)
+        return "\(sign)\(change) (\(sign)\(pct)%)"
     }
 
     var body: some View {
@@ -198,7 +216,7 @@ struct StockRow: View {
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
 
-                    Text("\(stock.isPositive ? "+" : "")\(String(format: "%.2f", stock.priceChange)) (\(stock.isPositive ? "+" : "")\(String(format: "%.2f", stock.percentageChange))%)")
+                    Text(priceChangeText)
                         .font(.caption)
                         .fontWeight(.medium)
                         .padding(.horizontal, 8)
@@ -226,105 +244,67 @@ struct StockRow: View {
             .offset(y: isDragging ? dragOffset : visualOffset)
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: visualOffset)
             .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isDragging)
-            .contentShape(Rectangle())
-            .gesture(
-                // Single drag gesture handles both taps and swipes
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        guard draggingItem == nil else { return }
-                        let horizontal = value.translation.width
-                        let vertical = abs(value.translation.height)
-                        let totalMovement = abs(horizontal) + vertical
-
-                        // Ignore small movements (will be treated as tap on end)
-                        guard totalMovement > 10 else { return }
-
-                        // Only allow horizontal swipe if movement is primarily horizontal
-                        guard vertical < 30 else { return }
-
-                        if isRevealed {
-                            let newOffset = -trashWidth + horizontal
-                            swipeOffset = min(0, max(-trashWidth, newOffset))
-                        } else {
-                            if horizontal < 0 {
-                                if activeSwipeID != nil && activeSwipeID != stock.symbol {
-                                    activeSwipeID = nil
-                                }
-                                swipeOffset = max(-trashWidth, horizontal)
-                            }
-                        }
-                    }
-                    .onEnded { value in
-                        guard draggingItem == nil else { return }
-                        let horizontal = abs(value.translation.width)
-                        let vertical = abs(value.translation.height)
-                        let totalMovement = horizontal + vertical
-
-                        // Tap detection: minimal movement
-                        if totalMovement < 10 {
-                            if isRevealed {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    swipeOffset = 0
-                                    activeSwipeID = nil
-                                }
-                            } else {
-                                onClick()
-                            }
-                            return
-                        }
-
+        }
+        .contentShape(Rectangle())
+        .overlay {
+            // UIKit gesture overlay — properly coordinates with ScrollView
+            RowGestureOverlay(
+                onTap: {
+                    if isRevealed {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            if isRevealed {
-                                if value.translation.width > trashWidth * 0.3 {
-                                    swipeOffset = 0
-                                    activeSwipeID = nil
-                                } else {
-                                    swipeOffset = -trashWidth
-                                }
+                            swipeOffset = 0
+                            activeSwipeID = nil
+                        }
+                    } else {
+                        onClick()
+                    }
+                },
+                onSwipeChanged: { translation in
+                    if isRevealed {
+                        let newOffset = -trashWidth + translation
+                        swipeOffset = min(0, max(-trashWidth, newOffset))
+                    } else if translation < 0 {
+                        if activeSwipeID != nil && activeSwipeID != stock.symbol {
+                            activeSwipeID = nil
+                        }
+                        swipeOffset = max(-trashWidth, translation)
+                    }
+                },
+                onSwipeEnded: { translation in
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        if isRevealed {
+                            if translation > trashWidth * 0.3 {
+                                swipeOffset = 0
+                                activeSwipeID = nil
                             } else {
-                                if -value.translation.width > trashWidth * 0.4 {
-                                    swipeOffset = -trashWidth
-                                    activeSwipeID = stock.symbol
-                                } else {
-                                    swipeOffset = 0
-                                }
+                                swipeOffset = -trashWidth
+                            }
+                        } else {
+                            if -translation > trashWidth * 0.4 {
+                                swipeOffset = -trashWidth
+                                activeSwipeID = stock.symbol
+                            } else {
+                                swipeOffset = 0
                             }
                         }
                     }
-            )
-            .simultaneousGesture(
-                // Long press + drag gesture for reordering
-                LongPressGesture(minimumDuration: 0.3)
-                    .updating($isDetectingLongPress) { currentState, gestureState, _ in
-                        gestureState = currentState
-                    }
-                    .onEnded { _ in
-                        guard !isRevealed, draggingItem == nil else { return }
-                        onStartDrag()
-                        // Haptic feedback
-                        let generator = UIImpactFeedbackGenerator(style: .medium)
-                        generator.impactOccurred()
-                    }
-                    .sequenced(before: DragGesture())
-                    .onChanged { value in
-                        switch value {
-                        case .second(true, let drag):
-                            if let drag = drag, isDragging {
-                                onDragChanged(drag.translation.height)
-                            }
-                        default:
-                            break
-                        }
-                    }
-                    .onEnded { _ in
-                        if isDragging {
-                            onEndDrag()
-                        }
-                    }
+                },
+                onLongPressStart: {
+                    guard !isRevealed, draggingItem == nil else { return }
+                    onStartDrag()
+                },
+                onReorderChanged: { translation in
+                    onDragChanged(translation)
+                },
+                onReorderEnded: {
+                    onEndDrag()
+                },
+                isDragging: isDragging,
+                isRevealed: isRevealed
             )
         }
         .overlay(alignment: .trailing) {
-            // Trash button as overlay so it receives taps on top of content
+            // Trash button (frontmost — receives taps over gesture overlay)
             if swipeOffset < 0 || isRevealed {
                 Button {
                     onRemove()
@@ -350,6 +330,118 @@ struct StockRow: View {
                     swipeOffset = 0
                 }
             }
+        }
+    }
+}
+
+// MARK: - UIKit Gesture Overlay (ScrollView-compatible)
+
+private struct RowGestureOverlay: UIViewRepresentable {
+    var onTap: () -> Void
+    var onSwipeChanged: (CGFloat) -> Void
+    var onSwipeEnded: (CGFloat) -> Void
+    var onLongPressStart: () -> Void
+    var onReorderChanged: (CGFloat) -> Void
+    var onReorderEnded: () -> Void
+    var isDragging: Bool
+    var isRevealed: Bool
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+
+        // Horizontal swipe pan
+        let swipePan = UIPanGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleSwipePan(_:))
+        )
+        swipePan.delegate = context.coordinator
+        view.addGestureRecognizer(swipePan)
+        context.coordinator.swipePan = swipePan
+
+        // Tap
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleTap)
+        )
+        tap.require(toFail: swipePan)
+        view.addGestureRecognizer(tap)
+
+        // Long press for reorder
+        let longPress = UILongPressGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleLongPress(_:))
+        )
+        longPress.minimumPressDuration = 0.3
+        longPress.delegate = context.coordinator
+        view.addGestureRecognizer(longPress)
+        context.coordinator.longPress = longPress
+
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.parent = self
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var parent: RowGestureOverlay
+        var swipePan: UIPanGestureRecognizer?
+        var longPress: UILongPressGestureRecognizer?
+        var longPressStartY: CGFloat = 0
+
+        init(parent: RowGestureOverlay) {
+            self.parent = parent
+        }
+
+        @objc func handleTap() {
+            parent.onTap()
+        }
+
+        @objc func handleSwipePan(_ gesture: UIPanGestureRecognizer) {
+            let x = gesture.translation(in: gesture.view).x
+            switch gesture.state {
+            case .changed:
+                parent.onSwipeChanged(x)
+            case .ended, .cancelled:
+                parent.onSwipeEnded(x)
+            default: break
+            }
+        }
+
+        @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+            switch gesture.state {
+            case .began:
+                longPressStartY = gesture.location(in: gesture.view).y
+                parent.onLongPressStart()
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.impactOccurred()
+            case .changed:
+                let currentY = gesture.location(in: gesture.view).y
+                parent.onReorderChanged(currentY - longPressStartY)
+            case .ended, .cancelled:
+                parent.onReorderEnded()
+            default: break
+            }
+        }
+
+        // Only begin swipe pan for clearly horizontal movement
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            if gestureRecognizer == swipePan {
+                if parent.isDragging { return false }
+                let velocity = (gestureRecognizer as! UIPanGestureRecognizer)
+                    .velocity(in: gestureRecognizer.view)
+                // Require horizontal velocity to be at least 2x vertical
+                return abs(velocity.x) > abs(velocity.y) * 2.0
+            }
+            if gestureRecognizer == longPress {
+                return !parent.isDragging && !parent.isRevealed
+            }
+            return true
         }
     }
 }
