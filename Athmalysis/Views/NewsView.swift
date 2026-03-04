@@ -5,6 +5,7 @@ struct NewsView: View {
 
     @State private var currentStockIndex: Int = 0
     @State private var dragOffset: CGSize = .zero
+    @State private var verticalDragOffset: CGFloat = 0
 
     private var stockSymbol: String {
         viewModel.selectedStock
@@ -23,8 +24,109 @@ struct NewsView: View {
     }
 
     var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Show current stock and adjacent stocks for smooth transitions
+                ForEach(Array(viewModel.watchlistStocks.enumerated()), id: \.element) { index, symbol in
+                    if abs(index - currentStockIndex) <= 1 {
+                        stockContentView(for: symbol, at: index, screenHeight: geometry.size.height)
+                    }
+                }
+            }
+        }
+        .background(Color.black)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    let horizontal = value.translation.width
+                    let vertical = value.translation.height
+
+                    if abs(vertical) > abs(horizontal) {
+                        // Vertical drag for stock switching
+                        verticalDragOffset = vertical
+                        dragOffset = .zero
+                    } else {
+                        // Horizontal drag for article swiping
+                        dragOffset = CGSize(width: horizontal, height: 0)
+                        verticalDragOffset = 0
+                    }
+                }
+                .onEnded { value in
+                    let horizontal = value.translation.width
+                    let vertical = value.translation.height
+
+                    if abs(vertical) > abs(horizontal) && abs(vertical) > 100 {
+                        // Stock switching
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            if vertical > 0 {
+                                if currentStockIndex > 0 {
+                                    currentStockIndex -= 1
+                                    viewModel.selectedStock = viewModel.watchlistStocks[currentStockIndex]
+                                }
+                            } else {
+                                if currentStockIndex < viewModel.watchlistStocks.count - 1 {
+                                    currentStockIndex += 1
+                                    viewModel.selectedStock = viewModel.watchlistStocks[currentStockIndex]
+                                }
+                            }
+                            verticalDragOffset = 0
+                        }
+                    } else if abs(horizontal) > abs(vertical) && abs(horizontal) > 100 {
+                        // Article swiping
+                        if !showEndMessage {
+                            if horizontal > 0 {
+                                if !articles.isEmpty && currentArticleIndex < articles.count {
+                                    let currentArticle = articles[currentArticleIndex]
+                                    viewModel.swipeArticle(stockSymbol: stockSymbol, articleId: currentArticle.id)
+
+                                    if currentArticleIndex == articles.count - 1 {
+                                        viewModel.markEndMessageShown(stockSymbol: stockSymbol)
+                                    } else {
+                                        viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
+                                    }
+                                }
+                            } else {
+                                if !articles.isEmpty {
+                                    if currentArticleIndex == articles.count - 1 {
+                                        viewModel.markEndMessageShown(stockSymbol: stockSymbol)
+                                    } else {
+                                        viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        dragOffset = .zero
+                        verticalDragOffset = 0
+                    }
+                }
+        )
+        .navigationBarHidden(true)
+        .onAppear {
+            if let idx = viewModel.watchlistStocks.firstIndex(of: stockSymbol) {
+                currentStockIndex = idx
+            }
+        }
+        .onChange(of: viewModel.selectedStock) { _, newValue in
+            if let idx = viewModel.watchlistStocks.firstIndex(of: newValue) {
+                currentStockIndex = idx
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func stockContentView(for symbol: String, at index: Int, screenHeight: CGFloat) -> some View {
+        let pageSpacing = screenHeight + 100 // Extra gap so next stock title is below tab bar
+        let offset = CGFloat(index - currentStockIndex) * pageSpacing + verticalDragOffset
+        let articles = viewModel.newsDataMap[symbol] ?? []
+        let currentArticleIndex = viewModel.articleIndexPerStock[symbol] ?? 0
+        let showEndMessage = viewModel.endMessageShownForStocks.contains(symbol)
+
         VStack(spacing: 0) {
-            if viewModel.watchlistStocks.isEmpty || stockSymbol.isEmpty {
+            if viewModel.watchlistStocks.isEmpty || symbol.isEmpty {
                 Spacer()
                 Text("Your watchlist is empty.\nAdd stocks to get started.")
                     .multilineTextAlignment(.center)
@@ -32,7 +134,7 @@ struct NewsView: View {
                 Spacer()
             } else {
                 // Stock name header
-                Text(viewModel.stockDataMap[stockSymbol]?.name ?? stockSymbol)
+                Text(viewModel.stockDataMap[symbol]?.name ?? symbol)
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
@@ -60,7 +162,7 @@ struct NewsView: View {
                 if showEndMessage {
                     Spacer()
                     Button(action: {
-                        viewModel.newsNavPath.append(NewsRoute.detailedAISummary(stockSymbol))
+                        viewModel.newsNavPath.append(NewsRoute.detailedAISummary(symbol))
                     }) {
                         HStack(spacing: 12) {
                             Image(systemName: "sparkles")
@@ -121,8 +223,8 @@ struct NewsView: View {
                             .fill(Color(white: 0.11))
                     )
                     .padding(.horizontal, 16)
-                    .offset(x: dragOffset.width)
-                    .opacity(1.0 - min(Double(abs(dragOffset.width)) / 300.0, 0.5))
+                    .offset(x: index == currentStockIndex ? dragOffset.width : 0)
+                    .opacity(index == currentStockIndex ? 1.0 - min(Double(abs(dragOffset.width)) / 300.0, 0.5) : 1.0)
                 } else {
                     Spacer()
                     Text("No articles available")
@@ -162,69 +264,8 @@ struct NewsView: View {
                 Spacer().frame(height: 8)
             }
         }
+        .frame(width: UIScreen.main.bounds.width, height: screenHeight)
         .background(Color.black)
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    dragOffset = value.translation
-                }
-                .onEnded { value in
-                    let horizontal = value.translation.width
-                    let vertical = value.translation.height
-
-                    if abs(vertical) > abs(horizontal) && abs(vertical) > 100 {
-                        if vertical > 0 {
-                            if currentStockIndex > 0 {
-                                currentStockIndex -= 1
-                                viewModel.selectedStock = viewModel.watchlistStocks[currentStockIndex]
-                            }
-                        } else {
-                            if currentStockIndex < viewModel.watchlistStocks.count - 1 {
-                                currentStockIndex += 1
-                                viewModel.selectedStock = viewModel.watchlistStocks[currentStockIndex]
-                            }
-                        }
-                    } else if abs(horizontal) > abs(vertical) && abs(horizontal) > 100 {
-                        if !showEndMessage {
-                            if horizontal > 0 {
-                                if !articles.isEmpty && currentArticleIndex < articles.count {
-                                    let currentArticle = articles[currentArticleIndex]
-                                    viewModel.swipeArticle(stockSymbol: stockSymbol, articleId: currentArticle.id)
-
-                                    if currentArticleIndex == articles.count - 1 {
-                                        viewModel.markEndMessageShown(stockSymbol: stockSymbol)
-                                    } else {
-                                        viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
-                                    }
-                                }
-                            } else {
-                                if !articles.isEmpty {
-                                    if currentArticleIndex == articles.count - 1 {
-                                        viewModel.markEndMessageShown(stockSymbol: stockSymbol)
-                                    } else {
-                                        viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    withAnimation(.spring(response: 0.3)) {
-                        dragOffset = .zero
-                    }
-                }
-        )
-        .navigationBarHidden(true)
-        .onAppear {
-            if let idx = viewModel.watchlistStocks.firstIndex(of: stockSymbol) {
-                currentStockIndex = idx
-            }
-        }
-        .onChange(of: viewModel.selectedStock) { _, newValue in
-            if let idx = viewModel.watchlistStocks.firstIndex(of: newValue) {
-                currentStockIndex = idx
-            }
-        }
+        .offset(y: offset)
     }
 }

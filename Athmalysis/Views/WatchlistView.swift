@@ -177,26 +177,6 @@ struct StockRow: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            // Trash button behind the row
-            if swipeOffset < 0 || isRevealed {
-                Button {
-                    onRemove()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 40, height: 40)
-                        Image(systemName: "trash.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.white)
-                    }
-                    .frame(width: trashWidth)
-                    .frame(maxHeight: .infinity)
-                }
-                .padding(.vertical, 12)
-                .transition(.move(edge: .trailing))
-            }
-
             // Main row content
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -342,6 +322,27 @@ struct StockRow: View {
                         }
                     }
             )
+        }
+        .overlay(alignment: .trailing) {
+            // Trash button as overlay so it receives taps on top of content
+            if swipeOffset < 0 || isRevealed {
+                Button {
+                    onRemove()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: trashWidth)
+                    .frame(maxHeight: .infinity)
+                }
+                .padding(.vertical, 12)
+                .transition(.move(edge: .trailing))
+            }
         }
         .onChange(of: activeSwipeID) { _, newValue in
             if newValue != stock.symbol && swipeOffset != 0 {
