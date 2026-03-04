@@ -50,7 +50,7 @@ class AlphaVantageService {
                 id: "\(symbol)_\(index + 1)",
                 title: item.title ?? "Article \(index + 1)",
                 summary: item.summary ?? "No summary available",
-                publishedAt: Self.formatTimeAgo(item.timePublished),
+                publishedAt: Self.parseDate(item.timePublished) ?? Date(),
                 publisher: item.source ?? "Unknown Publisher",
                 stockSymbol: symbol,
                 url: item.url
@@ -60,32 +60,14 @@ class AlphaVantageService {
 
     // MARK: - Helpers
 
-    static func formatTimeAgo(_ timestamp: String?) -> String {
-        guard let timestamp = timestamp else { return "Unknown time" }
+    static func parseDate(_ timestamp: String?) -> Date? {
+        guard let timestamp = timestamp else { return nil }
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd'T'HHmmss"
         formatter.timeZone = TimeZone(identifier: "UTC")
 
-        guard let date = formatter.date(from: timestamp) else { return timestamp }
-
-        let now = Date()
-        let diff = now.timeIntervalSince(date)
-
-        let seconds = Int(diff)
-        let minutes = seconds / 60
-        let hours = minutes / 60
-        let days = hours / 24
-
-        if days > 0 {
-            return "\(days) day\(days > 1 ? "s" : "") ago"
-        } else if hours > 0 {
-            return "\(hours) hour\(hours > 1 ? "s" : "") ago"
-        } else if minutes > 0 {
-            return "\(minutes) minute\(minutes > 1 ? "s" : "") ago"
-        } else {
-            return "Just now"
-        }
+        return formatter.date(from: timestamp)
     }
 }
 

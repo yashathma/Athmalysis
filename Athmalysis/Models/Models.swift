@@ -15,10 +15,31 @@ struct NewsArticle: Codable, Identifiable {
     let id: String
     let title: String
     let summary: String
-    let publishedAt: String
+    let publishedAt: Date  // Store actual date instead of formatted string
     let publisher: String
     let stockSymbol: String
     let url: String?
+
+    // Computed property to get "time ago" string
+    var timeAgo: String {
+        let now = Date()
+        let diff = now.timeIntervalSince(publishedAt)
+
+        let seconds = Int(diff)
+        let minutes = seconds / 60
+        let hours = minutes / 60
+        let days = hours / 24
+
+        if days > 0 {
+            return "\(days) day\(days > 1 ? "s" : "") ago"
+        } else if hours > 0 {
+            return "\(hours) hour\(hours > 1 ? "s" : "") ago"
+        } else if minutes > 0 {
+            return "\(minutes) minute\(minutes > 1 ? "s" : "") ago"
+        } else {
+            return "Just now"
+        }
+    }
 }
 
 struct AISummary: Codable {

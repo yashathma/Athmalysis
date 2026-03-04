@@ -14,6 +14,8 @@ class DataManager {
         static let articleIndex = "article_index_per_stock"
         static let endMessageShown = "end_message_shown_stocks"
         static let selectedStock = "selected_stock"
+        static let lastNewsFetchDate = "last_news_fetch_date"
+        static let lastPriceFetchDate = "last_price_fetch_date"
     }
 
     private init() {}
@@ -127,6 +129,34 @@ class DataManager {
         defaults.string(forKey: Keys.selectedStock) ?? ""
     }
 
+    // MARK: - Last Fetch Dates
+
+    func saveLastNewsFetchDate(_ dates: [String: Date]) {
+        if let data = try? encoder.encode(dates) {
+            defaults.set(data, forKey: Keys.lastNewsFetchDate)
+        }
+    }
+
+    func loadLastNewsFetchDate() -> [String: Date] {
+        guard let data = defaults.data(forKey: Keys.lastNewsFetchDate),
+              let dates = try? decoder.decode([String: Date].self, from: data) else {
+            return [:]
+        }
+        return dates
+    }
+
+    func saveLastPriceFetchDate(_ date: Date?) {
+        if let date = date {
+            defaults.set(date, forKey: Keys.lastPriceFetchDate)
+        } else {
+            defaults.removeObject(forKey: Keys.lastPriceFetchDate)
+        }
+    }
+
+    func loadLastPriceFetchDate() -> Date? {
+        return defaults.object(forKey: Keys.lastPriceFetchDate) as? Date
+    }
+
     // MARK: - Clear
 
     func clearAll() {
@@ -140,17 +170,20 @@ class DataManager {
         var swiped = loadSwipedArticles()
         var index = loadArticleIndex()
         var endMsg = loadEndMessageShown()
+        var newsFetchDate = loadLastNewsFetchDate()
 
         stockData.removeValue(forKey: symbol)
         newsData.removeValue(forKey: symbol)
         swiped.removeValue(forKey: symbol)
         index.removeValue(forKey: symbol)
         endMsg.remove(symbol)
+        newsFetchDate.removeValue(forKey: symbol)
 
         saveStockData(stockData)
         saveNewsData(newsData)
         saveSwipedArticles(swiped)
         saveArticleIndex(index)
         saveEndMessageShown(endMsg)
+        saveLastNewsFetchDate(newsFetchDate)
     }
 }

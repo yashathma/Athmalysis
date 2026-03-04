@@ -68,7 +68,7 @@ struct DetailedAISummaryView: View {
 
                                 Spacer().frame(height: 10)
 
-                                Text("\(article.publishedAt) \u{00B7} \(article.publisher)")
+                                Text("\(article.timeAgo) \u{00B7} \(article.publisher)")
                                     .font(.caption)
                                     .foregroundStyle(.gray)
 

@@ -32,6 +32,14 @@ class AppViewModel: ObservableObject {
         didSet { DataManager.shared.saveEndMessageShown(endMessageShownForStocks) }
     }
 
+    // MARK: - Fetch Tracking
+    @Published var lastNewsFetchDate: [String: Date] {
+        didSet { DataManager.shared.saveLastNewsFetchDate(lastNewsFetchDate) }
+    }
+    @Published var lastPriceFetchDate: Date? {
+        didSet { DataManager.shared.saveLastPriceFetchDate(lastPriceFetchDate) }
+    }
+
     // MARK: - Loading State
     @Published var isLoadingStock = false
     @Published var isRefreshing = false
@@ -52,6 +60,8 @@ class AppViewModel: ObservableObject {
         self.swipedArticles = dm.loadSwipedArticles()
         self.articleIndexPerStock = dm.loadArticleIndex()
         self.endMessageShownForStocks = dm.loadEndMessageShown()
+        self.lastNewsFetchDate = dm.loadLastNewsFetchDate()
+        self.lastPriceFetchDate = dm.loadLastPriceFetchDate()
     }
 
     // MARK: - Actions
@@ -77,6 +87,8 @@ class AppViewModel: ObservableObject {
                 watchlistStocks.append(symbol)
                 stockDataMap[symbol] = stock
                 newsDataMap[symbol] = news
+                lastNewsFetchDate[symbol] = Date()
+                lastPriceFetchDate = Date()
                 if selectedStock.isEmpty {
                     selectedStock = symbol
                 }
@@ -102,6 +114,7 @@ class AppViewModel: ObservableObject {
         endMessageShownForStocks.remove(symbol)
         stockDataMap.removeValue(forKey: symbol)
         newsDataMap.removeValue(forKey: symbol)
+        lastNewsFetchDate.removeValue(forKey: symbol)
         DataManager.shared.clearStockData(symbol)
 
         if selectedStock == symbol {
@@ -133,6 +146,7 @@ class AppViewModel: ObservableObject {
                 for stock in stocks {
                     stockDataMap[stock.symbol] = stock
                 }
+                lastPriceFetchDate = Date()
             } catch {
                 errorMessage = "Failed to refresh: \(error.localizedDescription)"
             }
@@ -186,6 +200,7 @@ class AppViewModel: ObservableObject {
                 for stock in stocks {
                     stockDataMap[stock.symbol] = stock
                 }
+                lastPriceFetchDate = Date()
             } catch {
                 // Silent refresh — don't show errors to user
             }
@@ -204,5 +219,68 @@ class AppViewModel: ObservableObject {
 
     func markEndMessageShown(stockSymbol: String) {
         endMessageShownForStocks.insert(stockSymbol)
+    }
+
+    // MARK: - Refresh Logic
+
+    private func isNewDay(since lastDate: Date?) -> Bool {
+        guard let lastDate = lastDate else { return true }
+
+        let calendar = Calendar.current
+        let lastDay = calendar.startOfDay(for: lastDate)
+        let today = calendar.startOfDay(for: Date())
+
+        return today > lastDay
+    }
+
+    private func isNewTradingDay(since lastDate: Date?) -> Bool {
+        guard let lastDate = lastDate else { return true }
+
+        let calendar = Calendar.current
+        let eastern = TimeZone(identifier: "America/New_York")!
+        var calendarET = Calendar(identifier: .gregorian)
+        calendarET.timeZone = eastern
+
+        let lastDay = calendarET.startOfDay(for: lastDate)
+        let today = calendarET.startOfDay(for: Date())
+
+        return today > lastDay
+    }
+
+    func checkAndRefreshIfNeeded() {
+        // Check if we need to refresh prices (new trading day)
+        if isNewTradingDay(since: lastPriceFetchDate) {
+            refreshPrices()
+        }
+
+        // Check if we need to refresh news for any stocks (new day)
+        for symbol in watchlistStocks {
+            if isNewDay(since: lastNewsFetchDate[symbol]) {
+                refreshNewsForStock(symbol)
+            }
+        }
+    }
+
+    private func refreshNewsForStock(_ symbol: String) {
+        Task {
+            do {
+                let news = try await newsService.fetchNews(symbol: symbol)
+
+                if !news.isEmpty {
+                    // Replace news articles on news page
+                    newsDataMap[symbol] = news
+                    lastNewsFetchDate[symbol] = Date()
+
+                    // Reset article index for this stock since we have new articles
+                    articleIndexPerStock[symbol] = 0
+                    endMessageShownForStocks.remove(symbol)
+
+                    // Note: swipedArticles[symbol] is NOT cleared - those persist until stock is removed
+                }
+            } catch {
+                // Silent refresh - don't show errors
+                print("Failed to refresh news for \(symbol): \(error)")
+            }
+        }
     }
 }
