@@ -73,28 +73,43 @@ struct NewsView: View {
                             verticalDragOffset = 0
                         }
                     } else if abs(horizontal) > abs(vertical) && abs(horizontal) > 100 {
-                        // Article swiping
+                        // Article swiping - throw card off screen
                         if !showEndMessage {
-                            if horizontal > 0 {
-                                if !articles.isEmpty && currentArticleIndex < articles.count {
-                                    let currentArticle = articles[currentArticleIndex]
-                                    viewModel.swipeArticle(stockSymbol: stockSymbol, articleId: currentArticle.id)
+                            let throwTarget = horizontal > 0 ? UIScreen.main.bounds.width * 1.5 : -UIScreen.main.bounds.width * 1.5
 
-                                    if currentArticleIndex == articles.count - 1 {
-                                        viewModel.markEndMessageShown(stockSymbol: stockSymbol)
-                                    } else {
-                                        viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
-                                    }
-                                }
-                            } else {
-                                if !articles.isEmpty {
-                                    if currentArticleIndex == articles.count - 1 {
-                                        viewModel.markEndMessageShown(stockSymbol: stockSymbol)
-                                    } else {
-                                        viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
-                                    }
-                                }
+                            // Animate card flying off screen
+                            withAnimation(.easeIn(duration: 0.3)) {
+                                dragOffset = CGSize(width: throwTarget, height: 0)
                             }
+
+                            // After animation completes, update state and reset
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                if horizontal > 0 {
+                                    if !articles.isEmpty && currentArticleIndex < articles.count {
+                                        let currentArticle = articles[currentArticleIndex]
+                                        viewModel.swipeArticle(stockSymbol: stockSymbol, articleId: currentArticle.id)
+
+                                        if currentArticleIndex == articles.count - 1 {
+                                            viewModel.markEndMessageShown(stockSymbol: stockSymbol)
+                                        } else {
+                                            viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
+                                        }
+                                    }
+                                } else {
+                                    if !articles.isEmpty {
+                                        if currentArticleIndex == articles.count - 1 {
+                                            viewModel.markEndMessageShown(stockSymbol: stockSymbol)
+                                        } else {
+                                            viewModel.setArticleIndex(stockSymbol: stockSymbol, index: currentArticleIndex + 1)
+                                        }
+                                    }
+                                }
+
+                                // Reset offset instantly (no animation) so next card appears clean
+                                dragOffset = .zero
+                            }
+                            verticalDragOffset = 0
+                            return
                         }
                     }
 
@@ -115,6 +130,52 @@ struct NewsView: View {
                 currentStockIndex = idx
             }
         }
+    }
+
+    @ViewBuilder
+    private func articleCard(for article: NewsArticle, isNext: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let urlString = article.url, let url = URL(string: urlString) {
+                Text(article.title)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.blue)
+                    .lineSpacing(4)
+                    .underline()
+                    .onTapGesture {
+                        if !isNext {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+            } else {
+                Text(article.title)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .lineSpacing(4)
+            }
+
+            Spacer().frame(height: 10)
+
+            Text("\(article.publishedAt) \u{00B7} \(article.publisher)")
+                .font(.caption)
+                .foregroundStyle(.gray)
+
+            Spacer().frame(height: 16)
+
+            Text(article.summary)
+                .font(.body)
+                .foregroundStyle(Color(white: 0.85))
+                .lineSpacing(4)
+                .minimumScaleFactor(0.5)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(white: 0.11))
+        )
+        .padding(.horizontal, 16)
     }
 
     @ViewBuilder
@@ -181,50 +242,21 @@ struct NewsView: View {
                     }
                     Spacer()
                 } else if !articles.isEmpty && currentArticleIndex < articles.count {
-                    let currentArticle = articles[currentArticleIndex]
-
-                    VStack(alignment: .leading, spacing: 0) {
-                        if let urlString = currentArticle.url, let url = URL(string: urlString) {
-                            Text(currentArticle.title)
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.blue)
-                                .lineSpacing(4)
-                                .underline()
-                                .onTapGesture {
-                                    UIApplication.shared.open(url)
-                                }
-                        } else {
-                            Text(currentArticle.title)
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.white)
-                                .lineSpacing(4)
+                    // Show stacked cards: current and next article
+                    ZStack {
+                        // Next article card (behind, full size, just sitting there)
+                        if currentArticleIndex + 1 < articles.count {
+                            articleCard(for: articles[currentArticleIndex + 1], isNext: true)
                         }
 
-                        Spacer().frame(height: 10)
-
-                        Text("\(currentArticle.publishedAt) \u{00B7} \(currentArticle.publisher)")
-                            .font(.caption)
-                            .foregroundStyle(.gray)
-
-                        Spacer().frame(height: 16)
-
-                        Text(currentArticle.summary)
-                            .font(.body)
-                            .foregroundStyle(Color(white: 0.85))
-                            .lineSpacing(4)
-                            .minimumScaleFactor(0.5)
+                        // Current article card (on top)
+                        articleCard(for: articles[currentArticleIndex], isNext: false)
+                            .offset(x: index == currentStockIndex ? dragOffset.width : 0)
+                            .rotationEffect(.degrees(index == currentStockIndex ? Double(dragOffset.width) / 20 : 0))
+                            .opacity(index == currentStockIndex ? 1.0 - min(Double(abs(dragOffset.width)) / 400.0, 0.3) : 1.0)
+                            .zIndex(1)
                     }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(white: 0.11))
-                    )
-                    .padding(.horizontal, 16)
-                    .offset(x: index == currentStockIndex ? dragOffset.width : 0)
-                    .opacity(index == currentStockIndex ? 1.0 - min(Double(abs(dragOffset.width)) / 300.0, 0.5) : 1.0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     Spacer()
                     Text("No articles available")
