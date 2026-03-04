@@ -46,27 +46,44 @@ struct DetailedAISummaryView: View {
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         ForEach(articles) { article in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(article.title)
-                                    .font(.title3)
-                                    .fontWeight(.bold)
+                            VStack(alignment: .leading, spacing: 0) {
+                                // Title with link (matching NewsView style)
+                                if let urlString = article.url, let url = URL(string: urlString) {
+                                    Text(article.title)
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(.blue)
+                                        .lineSpacing(4)
+                                        .underline()
+                                        .onTapGesture {
+                                            UIApplication.shared.open(url)
+                                        }
+                                } else {
+                                    Text(article.title)
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(.white)
+                                        .lineSpacing(4)
+                                }
 
-                                Text("\(article.publishedAt) by \(article.publisher)")
+                                Spacer().frame(height: 10)
+
+                                Text("\(article.publishedAt) \u{00B7} \(article.publisher)")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.gray)
 
-                                Spacer().frame(height: 4)
+                                Spacer().frame(height: 16)
 
                                 Text(article.summary)
-                                    .font(.subheadline)
-                                    .lineSpacing(2)
+                                    .font(.body)
+                                    .foregroundStyle(Color(white: 0.85))
+                                    .lineSpacing(4)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                            .padding(20)
                             .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemBackground))
-                                    .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(white: 0.11))
                             )
                         }
                     }
