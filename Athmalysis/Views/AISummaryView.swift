@@ -52,23 +52,22 @@ struct StockSummaryCard: View {
 
     var body: some View {
         Button(action: onClick) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(stockSymbol)
-                    .font(.title3)
+                    .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
 
                 Text("You swiped right on \(articleCount) article\(articleCount != 1 ? "s" : "")")
-                    .font(.subheadline)
-                    .foregroundStyle(.primary)
-                    .lineSpacing(2)
+                    .font(.body)
+                    .foregroundStyle(.gray)
+                    .lineSpacing(4)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
+            .padding(20)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(white: 0.11))
             )
         }
     }
