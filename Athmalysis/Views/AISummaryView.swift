@@ -32,6 +32,7 @@ struct AISummaryView: View {
                     ForEach(stocksWithSwipedArticles, id: \.symbol) { item in
                         StockSummaryCard(
                             stockSymbol: item.symbol,
+                            stockName: viewModel.stockDataMap[item.symbol]?.name,
                             articleCount: item.count
                         ) {
                             viewModel.aiNavPath.append(AIRoute.detailedAISummary(item.symbol))
@@ -47,16 +48,23 @@ struct AISummaryView: View {
 
 struct StockSummaryCard: View {
     let stockSymbol: String
+    let stockName: String?
     let articleCount: Int
     let onClick: () -> Void
 
     var body: some View {
         Button(action: onClick) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(stockSymbol)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
+
+                if let name = stockName {
+                    Text(name)
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                }
 
                 Text("You swiped right on \(articleCount) article\(articleCount != 1 ? "s" : "")")
                     .font(.body)
