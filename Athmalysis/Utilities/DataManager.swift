@@ -11,6 +11,7 @@ class DataManager {
         static let stockData = "stock_data_map"
         static let newsData = "news_data_map"
         static let swipedArticles = "swiped_articles"
+        static let savedArticles = "saved_articles_map"
         static let articleIndex = "article_index_per_stock"
         static let endMessageShown = "end_message_shown_stocks"
         static let closedStocks = "closed_stocks"
@@ -85,6 +86,22 @@ class DataManager {
             return [:]
         }
         return arrayMap.mapValues { Set($0) }
+    }
+
+    // MARK: - Saved Articles (swiped-right, persisted across news refreshes)
+
+    func saveSavedArticles(_ savedArticlesMap: [String: [NewsArticle]]) {
+        if let data = try? encoder.encode(savedArticlesMap) {
+            defaults.set(data, forKey: Keys.savedArticles)
+        }
+    }
+
+    func loadSavedArticles() -> [String: [NewsArticle]] {
+        guard let data = defaults.data(forKey: Keys.savedArticles),
+              let map = try? decoder.decode([String: [NewsArticle]].self, from: data) else {
+            return [:]
+        }
+        return map
     }
 
     // MARK: - Article Index
@@ -186,6 +203,7 @@ class DataManager {
         var stockData = loadStockData()
         var newsData = loadNewsData()
         var swiped = loadSwipedArticles()
+        var saved = loadSavedArticles()
         var index = loadArticleIndex()
         var endMsg = loadEndMessageShown()
         var closed = loadClosedStocks()
@@ -194,6 +212,7 @@ class DataManager {
         stockData.removeValue(forKey: symbol)
         newsData.removeValue(forKey: symbol)
         swiped.removeValue(forKey: symbol)
+        saved.removeValue(forKey: symbol)
         index.removeValue(forKey: symbol)
         endMsg.remove(symbol)
         closed.remove(symbol)
@@ -202,6 +221,7 @@ class DataManager {
         saveStockData(stockData)
         saveNewsData(newsData)
         saveSwipedArticles(swiped)
+        saveSavedArticles(saved)
         saveArticleIndex(index)
         saveEndMessageShown(endMsg)
         saveClosedStocks(closed)

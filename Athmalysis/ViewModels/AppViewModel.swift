@@ -25,6 +25,10 @@ class AppViewModel: ObservableObject {
     @Published var swipedArticles: [String: Set<String>] {
         didSet { DataManager.shared.saveSwipedArticles(swipedArticles) }
     }
+    /// Full article objects for articles swiped right — persists independently of newsDataMap refreshes
+    @Published var savedArticles: [String: [NewsArticle]] {
+        didSet { DataManager.shared.saveSavedArticles(savedArticles) }
+    }
     @Published var articleIndexPerStock: [String: Int] {
         didSet { DataManager.shared.saveArticleIndex(articleIndexPerStock) }
     }
@@ -61,6 +65,7 @@ class AppViewModel: ObservableObject {
         self.stockDataMap = dm.loadStockData()
         self.newsDataMap = dm.loadNewsData()
         self.swipedArticles = dm.loadSwipedArticles()
+        self.savedArticles = dm.loadSavedArticles()
         self.articleIndexPerStock = dm.loadArticleIndex()
         self.endMessageShownForStocks = dm.loadEndMessageShown()
         self.closedStocks = dm.loadClosedStocks()
@@ -114,6 +119,7 @@ class AppViewModel: ObservableObject {
     func removeStock(_ symbol: String) {
         watchlistStocks.removeAll { $0 == symbol }
         swipedArticles.removeValue(forKey: symbol)
+        savedArticles.removeValue(forKey: symbol)
         articleIndexPerStock.removeValue(forKey: symbol)
         endMessageShownForStocks.remove(symbol)
         closedStocks.remove(symbol)
@@ -212,10 +218,18 @@ class AppViewModel: ObservableObject {
         }
     }
 
-    func swipeArticle(stockSymbol: String, articleId: String) {
-        var current = swipedArticles[stockSymbol] ?? []
-        current.insert(articleId)
-        swipedArticles[stockSymbol] = current
+    func swipeArticle(stockSymbol: String, article: NewsArticle) {
+        // Track ID for filtering future fetches
+        var currentIds = swipedArticles[stockSymbol] ?? []
+        currentIds.insert(article.id)
+        swipedArticles[stockSymbol] = currentIds
+
+        // Persist full article object so Summary page survives news refreshes
+        var currentSaved = savedArticles[stockSymbol] ?? []
+        if !currentSaved.contains(where: { $0.id == article.id }) {
+            currentSaved.append(article)
+        }
+        savedArticles[stockSymbol] = currentSaved
     }
 
     func setArticleIndex(stockSymbol: String, index: Int) {

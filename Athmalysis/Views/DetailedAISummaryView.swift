@@ -5,15 +5,8 @@ struct DetailedAISummaryView: View {
     @Environment(\.dismiss) var dismiss
     let stockSymbol: String
 
-    private var swipedArticleIds: Set<String> {
-        viewModel.swipedArticles[stockSymbol] ?? []
-    }
-
     private var articles: [NewsArticle] {
-        let allArticles = viewModel.newsDataMap[stockSymbol] ?? []
-        return swipedArticleIds.compactMap { articleId in
-            allArticles.first { $0.id == articleId }
-        }
+        viewModel.savedArticles[stockSymbol] ?? []
     }
 
     var body: some View {

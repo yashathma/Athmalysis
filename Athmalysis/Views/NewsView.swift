@@ -92,7 +92,7 @@ struct NewsView: View {
                                 if horizontal > 0 {
                                     if !articles.isEmpty && currentArticleIndex < articles.count {
                                         let currentArticle = articles[currentArticleIndex]
-                                        viewModel.swipeArticle(stockSymbol: stockSymbol, articleId: currentArticle.id)
+                                        viewModel.swipeArticle(stockSymbol: stockSymbol, article: currentArticle)
 
                                         if currentArticleIndex == articles.count - 1 {
                                             // Last article swiped - close stock and move to next
