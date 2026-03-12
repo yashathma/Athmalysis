@@ -11,6 +11,15 @@ struct WatchlistView: View {
     @State private var showClosedStockAlert = false
     @State private var closedStockSymbol = ""
 
+    // Auto-scroll state
+    @State private var uiScrollView: UIScrollView? = nil
+    @State private var autoScrollTimer: Timer? = nil
+    @State private var dragScreenY: CGFloat = 0
+    @State private var scrollViewFrame: CGRect = .zero
+
+    private let rowHeight: CGFloat = 63
+    private let edgeZone: CGFloat = 80
+
     private var displayStocks: [Stock] {
         viewModel.watchlistStocks.compactMap { viewModel.stockDataMap[$0] }
     }
@@ -61,7 +70,7 @@ struct WatchlistView: View {
                                     isDragging: draggingItem == stock.symbol,
                                     dragOffset: draggingItem == stock.symbol ? dragOffset : 0,
                                     visualOffset: calculateVisualOffset(for: index),
-                                    onStartDrag: {
+                                    onStartDrag: { _ in
                                         draggingItem = stock.symbol
                                         draggingFromIndex = index
                                         draggingToIndex = index
@@ -70,7 +79,12 @@ struct WatchlistView: View {
                                         dragOffset = translation
                                         updateTargetIndex(currentIndex: index, translation: translation)
                                     },
+                                    onReorderChangedScreenY: { screenY in
+                                        dragScreenY = screenY
+                                        updateAutoScroll()
+                                    },
                                     onEndDrag: {
+                                        stopAutoScroll()
                                         performMove()
                                         draggingItem = nil
                                         draggingFromIndex = nil
@@ -103,7 +117,17 @@ struct WatchlistView: View {
                         }
                     }
                     .padding(.horizontal, 16)
+                    .background(
+                        ScrollViewCapture { sv in uiScrollView = sv }
+                    )
                 }
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.onAppear {
+                            scrollViewFrame = geo.frame(in: .global)
+                        }
+                    }
+                )
             }
         }
         .background(Color.black)
@@ -118,6 +142,66 @@ struct WatchlistView: View {
         }
         .onDisappear {
             viewModel.stopAutoRefresh()
+        }
+    }
+
+    // MARK: - Auto-scroll
+
+    private func updateAutoScroll() {
+        let topEdge = scrollViewFrame.minY + edgeZone
+        let bottomEdge = scrollViewFrame.maxY - edgeZone
+        let inEdgeZone = dragScreenY < topEdge || dragScreenY > bottomEdge
+        if inEdgeZone {
+            if autoScrollTimer == nil { startAutoScroll() }
+        } else {
+            stopAutoScroll()
+        }
+    }
+
+    private func startAutoScroll() {
+        // Fire at ~60fps for pixel-smooth scrolling
+        autoScrollTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+            DispatchQueue.main.async { self.performAutoScrollStep() }
+        }
+    }
+
+    private func stopAutoScroll() {
+        autoScrollTimer?.invalidate()
+        autoScrollTimer = nil
+    }
+
+    private func performAutoScrollStep() {
+        guard let sv = uiScrollView else { return }
+        let topEdge = scrollViewFrame.minY + edgeZone
+        let bottomEdge = scrollViewFrame.maxY - edgeZone
+
+        // Speed ramps from 2pt to 8pt per frame based on depth in the edge zone
+        let scrollAmount: CGFloat
+        if dragScreenY < topEdge {
+            let depth = min(1, (topEdge - dragScreenY) / edgeZone)
+            scrollAmount = -(2 + depth * 6)
+        } else if dragScreenY > bottomEdge {
+            let depth = min(1, (dragScreenY - bottomEdge) / edgeZone)
+            scrollAmount = 2 + depth * 6
+        } else {
+            stopAutoScroll()
+            return
+        }
+
+        let currentOffset = sv.contentOffset.y
+        let maxOffset = max(0, sv.contentSize.height - sv.bounds.height)
+        let newOffset = min(max(0, currentOffset + scrollAmount), maxOffset)
+        let actualAmount = newOffset - currentOffset
+        guard abs(actualAmount) > 0.1 else { stopAutoScroll(); return }
+
+        sv.setContentOffset(CGPoint(x: 0, y: newOffset), animated: false)
+
+        // Shift dragOffset by same amount so the dragged row stays pinned to the finger
+        dragOffset += actualAmount
+
+        // Recalculate target index from the updated offset
+        if let from = draggingFromIndex {
+            draggingToIndex = max(0, min(displayStocks.count - 1, from + Int(round(dragOffset / rowHeight))))
         }
     }
 
@@ -172,8 +256,9 @@ struct StockRow: View {
     let isDragging: Bool
     let dragOffset: CGFloat
     let visualOffset: CGFloat
-    let onStartDrag: () -> Void
+    let onStartDrag: (CGFloat) -> Void
     let onDragChanged: (CGFloat) -> Void
+    let onReorderChangedScreenY: (CGFloat) -> Void
     let onEndDrag: () -> Void
     let onClick: () -> Void
     let onRemove: () -> Void
@@ -289,12 +374,15 @@ struct StockRow: View {
                         }
                     }
                 },
-                onLongPressStart: {
+                onLongPressStart: { startScreenY in
                     guard !isRevealed, draggingItem == nil else { return }
-                    onStartDrag()
+                    onStartDrag(startScreenY)
                 },
                 onReorderChanged: { translation in
                     onDragChanged(translation)
+                },
+                onReorderChangedScreenY: { screenY in
+                    onReorderChangedScreenY(screenY)
                 },
                 onReorderEnded: {
                     onEndDrag()
@@ -340,8 +428,9 @@ private struct RowGestureOverlay: UIViewRepresentable {
     var onTap: () -> Void
     var onSwipeChanged: (CGFloat) -> Void
     var onSwipeEnded: (CGFloat) -> Void
-    var onLongPressStart: () -> Void
+    var onLongPressStart: (CGFloat) -> Void
     var onReorderChanged: (CGFloat) -> Void
+    var onReorderChangedScreenY: (CGFloat) -> Void
     var onReorderEnded: () -> Void
     var isDragging: Bool
     var isRevealed: Bool
@@ -417,12 +506,14 @@ private struct RowGestureOverlay: UIViewRepresentable {
             switch gesture.state {
             case .began:
                 longPressStartY = gesture.location(in: gesture.view).y
-                parent.onLongPressStart()
+                let startScreenY = gesture.location(in: nil).y
+                parent.onLongPressStart(startScreenY)
                 let generator = UIImpactFeedbackGenerator(style: .medium)
                 generator.impactOccurred()
             case .changed:
                 let currentY = gesture.location(in: gesture.view).y
                 parent.onReorderChanged(currentY - longPressStartY)
+                parent.onReorderChangedScreenY(gesture.location(in: nil).y)
             case .ended, .cancelled:
                 parent.onReorderEnded()
             default: break
@@ -444,4 +535,30 @@ private struct RowGestureOverlay: UIViewRepresentable {
             return true
         }
     }
+}
+
+// MARK: - UIScrollView Capture
+
+/// Walks up the UIView hierarchy from its position in the SwiftUI tree to find the
+/// nearest UIScrollView, then hands it back for direct content-offset manipulation.
+private struct ScrollViewCapture: UIViewRepresentable {
+    let onCapture: (UIScrollView) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        DispatchQueue.main.async {
+            var responder: UIView? = view
+            while let r = responder {
+                if let sv = r as? UIScrollView {
+                    onCapture(sv)
+                    return
+                }
+                responder = r.superview
+            }
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
 }
